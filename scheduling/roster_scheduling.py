@@ -5,9 +5,11 @@ from ortools.sat.python import cp_model
 def main():
     num_doctors = 18
     num_shifts = 2
-    num_days = 7
+    num_days = 30
     num_day_doctors = 3
     num_night_doctors = 5
+    max_morn_shifts = 9
+    max_night_shifts = 9
     all_doctors = range(num_doctors)
     all_shifts = range(num_shifts)
     all_days = range(num_days)
@@ -55,15 +57,13 @@ def main():
         for day in range(num_days - 1):
             model.Add(shifts[(doc, day, NIGHT_SHIFT)] + shifts[(doc, day + 1, MORN_SHIFT)] <= 1)
 
-    # # min_shifts_assigned is the largest integer such that every doctor can be
-    # # assigned at least that number of shifts.
-    # min_shifts_per_doctor = (num_shifts * num_days) // num_doctors
-    # max_shifts_per_doctor = min_shifts_per_doctor + 1
-    # for n in all_doctors:
-    #     num_shifts_worked = sum(
-    #         shifts[(n, d, s)] for d in all_days for s in all_shifts)
-    #     model.Add(min_shifts_per_doctor <= num_shifts_worked)
-    #     model.Add(num_shifts_worked <= max_shifts_per_doctor)
+    for doc in all_doctors:
+        num_morn_shifts_worked = sum(
+            shifts[(doc, day, MORN_SHIFT)] for day in all_days)
+        model.Add(num_morn_shifts_worked <= max_morn_shifts)
+        num_night_shifts_worked = sum(
+            shifts[(doc, day, NIGHT_SHIFT)] for day in all_days)
+        model.Add(num_night_shifts_worked <= max_night_shifts)
 
     # model.Maximize(
     #     sum(shift_requests[n][d][s] * shifts[(n, d, s)] for n in all_doctors
@@ -71,13 +71,16 @@ def main():
     # Creates the solver and solve.
     solver = cp_model.CpSolver()
     solver.Solve(model)
-    # sum_shifts = [][]
+    sum_shifts = {}
+    for doc in all_doctors:
+        for shift in all_shifts:
+            sum_shifts[(doc, shift)] = 0
     for day in all_days:
         print('Day', day)
         for shift in all_shifts:
             for doc in all_doctors:
                 if solver.Value(shifts[(doc, day, shift)]) == 1:
-                    # sum_shifts[doc][shift] += 1
+                    sum_shifts[(doc, shift)] += 1
                     print('Doctor', doc, 'works shift', shift)
                     # if shift_requests[n][d][s] == 1:
                     #     print('Doctor', n, 'works shift', s, '(requested).')
@@ -88,9 +91,9 @@ def main():
     # Statistics.
     print()
     print('Statistics')
-    # for doc in all_doctors:
-    #     print('Doctor', doc, 'has ', sum_shifts[doc][MORN_SHIFT], ' morning shifts.')
-    #     print('Doctor', doc, 'has ', sum_shifts[doc][NIGHT_SHIFT], ' night shifts.')
+    for doc in all_doctors:
+        print('Doctor', doc, 'has ', sum_shifts[(doc, MORN_SHIFT)], ' morning shifts.')
+        print('Doctor', doc, 'has ', sum_shifts[(doc, NIGHT_SHIFT)], ' night shifts.')
     # print('  - Number of shift requests met = %i' % solver.ObjectiveValue(),
     #       '(out of', num_doctors * min_shifts_per_doctor, ')')
     print('  - wall time       : %f s' % solver.WallTime())
