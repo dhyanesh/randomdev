@@ -48,7 +48,7 @@ def main():
     min_zone4_shifts = (num_days * 2) // num_doctors
     max_zone4_shifts = min_zone4_shifts + 1
 
-    min_mmh_shifts = 1
+    min_mmh_shifts = 0
     max_mmh_shifts = 2
 
     max_morn_shifts = 9
@@ -68,6 +68,10 @@ def main():
     ZONE_12 = 0
     ZONE_3 = 1
     ZONE_4 = 2
+
+    shift_exclusions = {MMH_SHIFT: [10, 15]}
+    zone_exclusions = {ZONE_3: [10, 15], ZONE_4: [10, 15]}
+
     shift_requests = []
     # shift_requests = [[[0, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
     #                    [0, 1, 0], [0, 0, 1]],
@@ -126,17 +130,28 @@ def main():
             shifts[(doc, day, MMH_SHIFT, zone)] for day in all_days for zone in all_zones)
         model.Add(num_morn_shifts_worked + num_night_shifts_worked + num_mmh_shifts_worked <= max_total_shifts)
         model.Add(num_morn_shifts_worked + num_night_shifts_worked + num_mmh_shifts_worked >= min_total_shifts)
-        model.Add(num_mmh_shifts_worked >= min_mmh_shifts * 2)
-        model.Add(num_mmh_shifts_worked <= max_mmh_shifts * 2)
-        num_zone_3_shifts_worked  = sum(
-                shifts[(doc, day, shift, ZONE_3)] for day in all_days for shift in all_shifts)
-        model.Add(num_zone_3_shifts_worked >= min_zone3_shifts)
-        model.Add(num_zone_3_shifts_worked <= max_zone3_shifts)
-        num_zone_4_shifts_worked  = sum(
-                shifts[(doc, day, shift, ZONE_4)] for day in all_days for shift in all_shifts)
-        model.Add(num_zone_4_shifts_worked >= min_zone4_shifts)
-        model.Add(num_zone_4_shifts_worked <= max_zone4_shifts)
+        if doc not in shift_exclusions[MMH_SHIFT]:
+            model.Add(num_mmh_shifts_worked >= min_mmh_shifts * 2)
+            model.Add(num_mmh_shifts_worked <= max_mmh_shifts * 2)
+        if doc not in zone_exclusions[ZONE_3]:
+            num_zone_3_shifts_worked  = sum(
+                    shifts[(doc, day, shift, ZONE_3)] for day in all_days for shift in all_shifts)
+            model.Add(num_zone_3_shifts_worked >= min_zone3_shifts)
+            model.Add(num_zone_3_shifts_worked <= max_zone3_shifts)
+        if doc not in zone_exclusions[ZONE_4]:
+            num_zone_4_shifts_worked  = sum(
+                    shifts[(doc, day, shift, ZONE_4)] for day in all_days for shift in all_shifts)
+            model.Add(num_zone_4_shifts_worked >= min_zone4_shifts)
+            model.Add(num_zone_4_shifts_worked <= max_zone4_shifts)
 
+
+    for shift, doc_list in shift_exclusions.items():
+        for doc in doc_list:
+            model.Add(sum(shifts[(doc, day, shift, zone)] for day in all_days for zone in all_zones) == 0)
+
+    for zone, doc_list in zone_exclusions.items():
+        for doc in doc_list:
+            model.Add(sum(shifts[(doc, day, shift, zone)] for day in all_days for shift in all_shifts) == 0)
 
     # model.Maximize(
     #     sum(shift_requests[n][d][s] * shifts[(n, d, s)] for n in all_doctors
