@@ -4,8 +4,27 @@ from __future__ import print_function
 from ortools.sat.python import cp_model
 import csv
 
+doctors = [
+"Dr. Mohan",
+"Dr. Chaitra",
+"Dr. Deepti",
+"Dr. Sangeet",
+"Dr. Sunil",
+"Dr. Nazreen",
+"Dr. Neelima",
+"Dr. Nitya",
+"Dr. Owais",
+"Dr. Sarath",
+"Dr. Shivanvesh",
+"Dr. Vikram",
+"Dr. Vishnu",
+"Dr. Abhiram",
+"Dr. Pallavi",
+"Dr. Amla",
+"Dr. Mittal"]
+
 def PrettyPrintDoctor(doctor):
-    return 'Doctor %i' % doctor
+    return doctors[doctor]
 
 def PrettyPrintShift(shift):
     if shift == 0:
@@ -33,27 +52,23 @@ def AddConsecutiveShiftConstraint(model, shifts, doc, day, shift1, shift2):
 
 
 def main():
-    num_doctors = 18
+    num_doctors = len(doctors)
     num_shifts = 3
-    num_days = 30
+    num_days = 31
     num_zones = 3
 
     num_morn_doctors = 3
     num_night_doctors = 5
     num_mmh_doctors = 1
 
-    min_zone3_shifts = (num_days * 2) // num_doctors
-    max_zone3_shifts = min_zone3_shifts + 1
-
-    min_zone4_shifts = (num_days * 2) // num_doctors
-    max_zone4_shifts = min_zone4_shifts + 1
-
     min_mmh_shifts = 0
-    max_mmh_shifts = 2
+    max_mmh_shifts = 3
 
     max_morn_shifts = 9
     max_night_shifts = 9
-    max_total_shifts = 18
+    max_total_shifts = 19
+    min_morn_shifts = max_morn_shifts - 2
+    min_night_shifts = max_night_shifts - 2
     min_total_shifts = max_total_shifts - 2
 
     all_doctors = range(num_doctors)
@@ -69,8 +84,14 @@ def main():
     ZONE_3 = 1
     ZONE_4 = 2
 
-    shift_exclusions = {MMH_SHIFT: [10, 15]}
-    zone_exclusions = {ZONE_3: [10, 15], ZONE_4: [10, 15]}
+    shift_exclusions = {MMH_SHIFT: [13, 14, 15]}
+    zone_exclusions = {ZONE_3: [13, 14], ZONE_4: [13, 14]}
+
+    min_zone3_shifts = (num_days * 2) // (num_doctors - len(zone_exclusions[ZONE_3]))
+    max_zone3_shifts = min_zone3_shifts + 1
+
+    min_zone4_shifts = (num_days * 2) // (num_doctors - len(zone_exclusions[ZONE_4]))
+    max_zone4_shifts = min_zone4_shifts + 1
 
     shift_requests = []
     # shift_requests = [[[0, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
@@ -95,9 +116,13 @@ def main():
                 for zone in all_zones:
                     shifts[(doc, day, shift, zone)] = model.NewBoolVar('shift_doc%iday%ishift%izone%i' % (doc, day, shift, zone))
 
+    sundays = [5, 12, 19, 26]
     # Set the number of day and night doctors according to the zone.
     for day in all_days:
-        model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_12)] for doc in all_doctors) == num_morn_doctors - 2)
+        if day - 1 in sundays:
+            model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_12)] for doc in all_doctors) == num_morn_doctors - 2 + 1)
+        else:
+            model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_12)] for doc in all_doctors) == num_morn_doctors - 2)
         model.Add(sum(shifts[(doc, day, NIGHT_SHIFT, ZONE_12)] for doc in all_doctors) == num_night_doctors - 2)
         model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_3)] for doc in all_doctors) == 1)
         model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_4)] for doc in all_doctors) == 1)
@@ -123,9 +148,11 @@ def main():
         num_morn_shifts_worked = sum(
             shifts[(doc, day, MORN_SHIFT, zone)] for day in all_days for zone in all_zones)
         model.Add(num_morn_shifts_worked <= max_morn_shifts)
+        model.Add(num_morn_shifts_worked >= min_morn_shifts)
         num_night_shifts_worked = sum(
             shifts[(doc, day, NIGHT_SHIFT, zone)] for day in all_days for zone in all_zones)
         model.Add(num_night_shifts_worked <= max_night_shifts)
+        model.Add(num_night_shifts_worked >= min_night_shifts)
         num_mmh_shifts_worked = 2 * sum(
             shifts[(doc, day, MMH_SHIFT, zone)] for day in all_days for zone in all_zones)
         model.Add(num_morn_shifts_worked + num_night_shifts_worked + num_mmh_shifts_worked <= max_total_shifts)
@@ -161,6 +188,8 @@ def main():
     if solver.Solve(model) == cp_model.INFEASIBLE:
         print('No solution found')
         exit()
+
+    print('Solution found')
     sum_shifts = {}
     for doc in all_doctors:
         for shift in all_shifts:
@@ -169,7 +198,7 @@ def main():
 
     with open('output.csv', 'w', newline='') as csvfile:
         fieldnames = ['Day', 'Morning zone 1/2', 'Morning zone 3', 'Morning zone 4',
-                '', 'Night zone 1/2', 'Night zone 3', 'Night zone 4', '', 'MMH', 'Total']
+                'Morning total', 'Night zone 1/2', 'Night zone 3', 'Night zone 4', 'Night total', 'MMH', 'Total']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
@@ -185,9 +214,9 @@ def main():
                             per_zone_doctors.append(PrettyPrintDoctor(doc))
                             sum_shifts[(doc, shift, zone)] += 1
                             if shift != MMH_SHIFT:
-                                print('Doctor', doc, 'works the ', PrettyPrintShift(shift), ' shift in zone ', PrettyPrintZone(zone))
+                                print(PrettyPrintDoctor(doc), 'works the ', PrettyPrintShift(shift), ' shift in zone ', PrettyPrintZone(zone))
                             else:
-                                print('Doctor', doc, 'works the ', PrettyPrintShift(shift), ' shift.')
+                                print(PrettyPrintDoctor(doc), 'works the ', PrettyPrintShift(shift), ' shift.')
                     if shift != MMH_SHIFT:
                         row[PrettyPrintShift(shift) + ' zone ' + PrettyPrintZone(zone)] = ','.join(per_zone_doctors)
                     else:
@@ -199,6 +228,7 @@ def main():
         # Statistics.
         print()
         writer.writerow({})
+        writer.writerow({'Night zone 1/2': 'Duty Totals'})
         print('Statistics')
         for doc in all_doctors:
             total = 0
@@ -212,9 +242,9 @@ def main():
                         doc_shifts *= 2
                     else:
                         row[PrettyPrintShift(shift) + ' zone ' + PrettyPrintZone(zone)] = doc_shifts
-                        print('Doctor', doc, 'has ', doc_shifts, ' ', PrettyPrintShift(shift), 'shifts in zone ', PrettyPrintZone(zone))
+                        print(PrettyPrintDoctor(doc), 'has ', doc_shifts, ' ', PrettyPrintShift(shift), 'shifts in zone ', PrettyPrintZone(zone))
                     total += doc_shifts
-                print('Doctor', doc, 'has ', shift_total, ' ', PrettyPrintShift(shift), 'shifts.')
+                print(PrettyPrintDoctor(doc), 'has ', shift_total, ' ', PrettyPrintShift(shift), 'shifts.')
                 if shift == MMH_SHIFT:
                     row[PrettyPrintShift(shift)] = shift_total
             print('Total shifts: ', total)
