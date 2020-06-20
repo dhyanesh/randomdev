@@ -3,6 +3,7 @@
 from __future__ import print_function
 from ortools.sat.python import cp_model
 import csv
+import calendar
 
 doctors = [
 "Dr. Mohan",
@@ -52,9 +53,19 @@ def AddConsecutiveShiftConstraint(model, shifts, doc, day, shift1, shift2):
 
 
 def main():
+    year = 2020
+    month = 7
+    num_days = calendar.monthrange(year, month)[1]
+    cal = calendar.Calendar()
+    all_days = []
+    all_day_weekday = []
+    for day, weekday in cal.itermonthdays2(year, month):
+        if day == 0:
+            continue
+        all_days.append(day)
+        all_day_weekday.append((day, weekday))
     num_doctors = len(doctors)
     num_shifts = 3
-    num_days = 31
     num_zones = 3
 
     num_morn_doctors = 3
@@ -65,15 +76,14 @@ def main():
     max_mmh_shifts = 3
 
     max_morn_shifts = 9
-    max_night_shifts = 9
+    max_night_shifts = 10
     max_total_shifts = 19
-    min_morn_shifts = max_morn_shifts - 2
+    min_morn_shifts = max_morn_shifts - 4
     min_night_shifts = max_night_shifts - 2
     min_total_shifts = max_total_shifts - 2
 
     all_doctors = range(num_doctors)
     all_shifts = range(num_shifts)
-    all_days = range(num_days)
     all_zones = range(num_zones)
 
     MORN_SHIFT = 0
@@ -118,8 +128,8 @@ def main():
 
     sundays = [5, 12, 19, 26]
     # Set the number of day and night doctors according to the zone.
-    for day in all_days:
-        if day - 1 in sundays:
+    for day, weekday in all_day_weekday:
+        if weekday == calendar.SUNDAY:
             model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_12)] for doc in all_doctors) == num_morn_doctors - 2 + 1)
         else:
             model.Add(sum(shifts[(doc, day, MORN_SHIFT, ZONE_12)] for doc in all_doctors) == num_morn_doctors - 2)
@@ -136,7 +146,7 @@ def main():
             model.Add(sum(shifts[(doc, day, shift, zone)] for shift in all_shifts for zone in all_zones) <= 1)
 
     for doc in all_doctors:
-        for day in range(num_days - 1):
+        for day in all_days[:-1]:
             AddConsecutiveShiftConstraint(model, shifts, doc, day, NIGHT_SHIFT, MORN_SHIFT)
             AddConsecutiveShiftConstraint(model, shifts, doc, day, NIGHT_SHIFT, NIGHT_SHIFT)
             AddConsecutiveShiftConstraint(model, shifts, doc, day, NIGHT_SHIFT, MMH_SHIFT)
@@ -196,15 +206,15 @@ def main():
             for zone in all_zones:
                 sum_shifts[(doc, shift, zone)] = 0
 
-    with open('output.csv', 'w', newline='') as csvfile:
-        fieldnames = ['Day', 'Morning zone 1/2', 'Morning zone 3', 'Morning zone 4',
+    with open('%s_%d.csv' % (calendar.month_name[month], year), 'w', newline='') as csvfile:
+        fieldnames = ['Day', 'Date', 'Morning zone 1/2', 'Morning zone 3', 'Morning zone 4',
                 'Morning total', 'Night zone 1/2', 'Night zone 3', 'Night zone 4', 'Night total', 'MMH', 'Total']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
-        for day in all_days:
+        for day, weekday in all_day_weekday:
             print('Day', day)
-            row = {'Day': day + 1}
+            row = {'Day': calendar.day_abbr[weekday], 'Date': day}
             for shift in all_shifts:
                 per_shift_doctors = []
                 for zone in all_zones:
@@ -229,6 +239,13 @@ def main():
         print()
         writer.writerow({})
         writer.writerow({'Night zone 1/2': 'Duty Totals'})
+        intermediate_headers = {}
+        for field in fieldnames:
+            if field=='Day':
+                intermediate_headers[field] = 'Doctor'
+            else:
+                intermediate_headers[field] = field
+        writer.writerow(intermediate_headers)
         print('Statistics')
         for doc in all_doctors:
             total = 0
@@ -247,6 +264,8 @@ def main():
                 print(PrettyPrintDoctor(doc), 'has ', shift_total, ' ', PrettyPrintShift(shift), 'shifts.')
                 if shift == MMH_SHIFT:
                     row[PrettyPrintShift(shift)] = shift_total
+                else:
+                    row[PrettyPrintShift(shift) + ' total'] = shift_total
             print('Total shifts: ', total)
             row['Total'] = total
             writer.writerow(row)
