@@ -56,23 +56,55 @@ class TestShiftScheduler(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.scheduler.read_roster_from_pdf('non_existent.pdf')
 
-    def test_get_month_from_roster_success(self):
+    def test_get_year_month_from_roster_success(self):
         # Arrange
         roster_df = pd.DataFrame({0: ['01-08-2025', '02-08-2025']})
 
         # Act
-        month = self.scheduler._get_month_from_roster(roster_df)
+        year, month = self.scheduler._get_year_month_from_roster(roster_df)
 
         # Assert
+        self.assertEqual(year, 2025)
         self.assertEqual(month, 8)
 
-    def test_get_month_from_roster_no_valid_date(self):
+    def test_get_year_month_from_roster_different_months(self):
+        # Arrange
+        roster_df = pd.DataFrame({0: ['01-08-2025', '02-09-2025']})
+
+        # Act & Assert
+        with self.assertRaises(ValueError) as context:
+            self.scheduler._get_year_month_from_roster(roster_df)
+        self.assertEqual(str(context.exception), "All dates in the roster must be for the same month.")
+
+    def test_get_year_month_from_roster_no_valid_date(self):
         # Arrange
         roster_df = pd.DataFrame({0: ['Invalid Date', None]})
 
         # Act & Assert
         with self.assertRaises(ValueError):
-            self.scheduler._get_month_from_roster(roster_df)
+            self.scheduler._get_year_month_from_roster(roster_df)
+
+    @patch('trilife_shifts.datetime')
+    def test_create_schedule_sheet_warning_for_wrong_month(self, mock_datetime):
+        # Arrange
+        mock_datetime.now.return_value = datetime(2025, 1, 1)
+        consultant = Consultant(name='Test', initial='TT', calendarId='test_cal', sharees=['test@test.com'])
+        roster_df = pd.DataFrame({
+            0: ['01-08-2025', '02-08-2025'],
+            1: ['TT', 'AM'],
+            2: ['SK', 'PS'],
+            3: ['SJ', 'TT']
+        })
+        mock_worksheet = MagicMock()
+        mock_worksheet.spreadsheet.id = 'test_sheet_id'
+        self.mock_google_service.create_sheet.return_value = mock_worksheet
+
+        with patch('builtins.print') as mock_print:
+            # Act
+            self.scheduler.create_schedule_sheet(consultant, roster_df)
+
+            # Assert
+            mock_print.assert_called_with("Warning: The roster month (August 2025) is not the current or next month.")
 
     def test_get_shifts(self):
         # Arrange
@@ -99,9 +131,10 @@ class TestShiftScheduler(unittest.TestCase):
         mock_worksheet = MagicMock()
         mock_worksheet.spreadsheet.id = 'test_sheet_id'
         self.mock_google_service.create_sheet.return_value = mock_worksheet
+        self.scheduler._get_year_month_from_roster = MagicMock(return_value=(2025, 8))
 
         # Act
-        worksheet = self.scheduler.create_schedule_sheet(consultant, 2025, roster_df)
+        worksheet = self.scheduler.create_schedule_sheet(consultant, roster_df)
 
         # Assert
         self.mock_google_service.create_sheet.assert_called_once_with('Shift Schedule for Test August 2025')
