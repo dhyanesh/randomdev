@@ -1,6 +1,9 @@
 #!/opt/homebrew/bin/python3
 
 from enum import Enum
+import copy
+import random
+import functools
 
 rows = 7
 cols = 7
@@ -84,7 +87,8 @@ class Board:
     def IsSet(self, pos):
         return self.board[pos.x]&(1<<pos.y) != 0
 
-    def Print(self):
+    def __str__(self):
+      ret = ""
       r = 0
       for row in self.board:
         row_str = ""
@@ -93,8 +97,10 @@ class Board:
             row_str += ("X " if (row & 1<<col) else "0 ")
           else:
             row_str += "  "
-        print(row_str)
+        ret += row_str + "\n"
         r += 1
+      ret += str(self.Count()) + "\n"
+      return ret
 
     def FindMoves(self):
         moves = []
@@ -112,15 +118,45 @@ class Board:
         return moves
 
     def ApplyMove(self, move):
-        pass
+        jumped = ApplyDirection(move.pos, 1, move.direction)
+        assert jumped!=None and self.IsSet(jumped)
+        destination = ApplyDirection(move.pos, 2, move.direction)
+        assert destination!=None and not self.IsSet(destination)
+        self.Clear(jumped)
+        self.Set(destination)
+        self.Clear(move.pos)
 
-def Solve(board):
-    pass
+    def Count(self):
+        count = 0
+        for row in self.board:
+            while row != 0:
+                count = count + 1
+                row &= (row - 1)
+        return count
 
-initial_board = Board()
-initial_board.Print()
-moves = initial_board.FindMoves()
-for move in moves:
-    print(move)
+def RandomSolve(board):
+    while True:
+        moves = board.FindMoves()
+        if len(moves) == 0: break
+        board.ApplyMove(random.choice(moves))
+        print(board)
 
-Solve(initial_board)
+@functools.cache
+def OptimalSolve(board):
+    moves = board.FindMoves()
+    min_count = board.Count()
+    if min_count == 1:
+        print(board)
+    for move in moves:
+        nb = copy.deepcopy(board)
+        nb.ApplyMove(move)
+        count = OptimalSolve(nb)
+        if count < min_count:
+            min_count = count
+    return min_count
+
+board = Board()
+print(board)
+
+# RandomSolve(board)
+print(OptimalSolve(board))
