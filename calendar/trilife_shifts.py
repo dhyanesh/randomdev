@@ -71,7 +71,7 @@ class ShiftScheduler:
             raise FileNotFoundError(f"PDF file not found at '{pdf_path}'")
         
         print(f"Reading PDF: {pdf_path}...")
-        tables = camelot.read_pdf(pdf_path, pages='all', flavor='stream')
+        tables = camelot.read_pdf(pdf_path, pages='1,2', flavor='lattice')
 
         if not tables:
             raise ValueError("No tables found in the PDF.")
@@ -171,18 +171,32 @@ def main():
     }
 
     parser = argparse.ArgumentParser(description='Automate Trilife shift scheduling.')
-    parser.add_argument('consultant', choices=consultant_map.keys(), help='Consultant name')
+    parser.add_argument('consultant', nargs='?', default=None, choices=consultant_map.keys(), help='Consultant name')
     parser.add_argument('pdf_path', help='Path to the roster PDF file')
     parser.add_argument('--create-sheet', action='store_true', help='Create a new Google Sheet from the PDF')
     parser.add_argument('--import-calendar', action='store_true', help='Import events to Google Calendar')
     parser.add_argument('--sheet-key', help='Google Sheet key (if not creating a new sheet)')
     parser.add_argument('--share-calendar', action='store_true', help='Share the Google Calendar')
+    parser.add_argument('--debug-parse', action='store_true', help='Parse the PDF and print the dataframe for debugging')
     args = parser.parse_args()
 
     try:
         google_service = GoogleServiceProvider('your_service_account_file.json')
         scheduler = ShiftScheduler(google_service)
-        
+
+        if args.debug_parse:
+            print("--- Running in Debug Parse Mode ---")
+            roster_df = scheduler.read_roster_from_pdf(args.pdf_path.strip())
+            print("\n--- Parsed Roster DataFrame ---")
+            print(roster_df.to_string())
+            print("-----------------------------")
+            exit()
+
+        if not args.consultant:
+            print("Error: 'consultant' argument is required unless using --debug-parse.")
+            parser.print_help()
+            exit(1)
+
         consultant_config = consultant_map[args.consultant]
         consultant = Consultant(name=args.consultant, **consultant_config)
 
