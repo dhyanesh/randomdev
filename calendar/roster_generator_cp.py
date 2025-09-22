@@ -64,23 +64,56 @@ import argparse
 import json
 
 # Based on the provided PDF and constraints.
-Consultant = namedtuple('Consultant', ['name', 'initial', 'is_senior'])
+Consultant = namedtuple('Consultant', ['name', 'initial', 'is_senior', 'gender'])
 
 CONSULTANTS = [
-    Consultant('DR. PRAVEEN. S', 'PS', True),
-    Consultant('DR. MOHAN', 'MH', True),
-    Consultant('DR. PRAVEEN KUMAR', 'PK', False),
-    Consultant('DR. SANTOSH', 'SK', True),
-    Consultant('DR. SHIVA SHANKAR.B', 'SB', False),
-    Consultant('DR. AMRITHA', 'AM', True),
-    Consultant('DR. MITTAL', 'MT', True),
-    Consultant('DR. MANJUNATH', 'MJ', False),
-    Consultant('DR. SIMMY JOHN', 'SJ', False),
-    Consultant('DR. MANJUNATH N S', 'MNS', True),
+    Consultant('DR. PRAVEEN. S', 'PS', True, 'Male'),
+    Consultant('DR. MOHAN', 'MH', True, 'Male'),
+    Consultant('DR. PRAVEEN KUMAR', 'PK', False, 'Male'),
+    Consultant('DR. SANTOSH', 'SK', True, 'Male'),
+    Consultant('DR. SHIVA SHANKAR.B', 'SB', False, 'Male'),
+    Consultant('DR. AMRITHA', 'AM', True, 'Female'),
+    Consultant('DR. MITTAL', 'MT', True, 'Male'),
+    Consultant('DR. MANJUNATH', 'MJ', False, 'Male'),
+    Consultant('DR. SIMMY JOHN', 'SJ', False, 'Female'),
+    Consultant('DR. MANJUNATH N S', 'MNS', True, 'Male'),
 ]
 
 
-def generate_roster_cp(year, month, vacations):
+def apply_monthly_constraints(model, shifts, consultants, all_days, all_shifts, year, month, monthly_constraints):
+    for constraint in monthly_constraints:
+        consultant_initial = constraint.get("consultant_initial")
+        consultant_idx = -1
+        if consultant_initial:
+            consultant_idx = [i for i, c in enumerate(consultants) if c.initial == consultant_initial][0]
+
+        constraint_type = constraint["type"]
+
+        if constraint_type == "no_shift_on_day":
+            shift_type = constraint["shift_type"]
+            days = constraint["days"]
+            shift_map = {"morning": 0, "afternoon": 1, "night": 2}
+            s_idx = shift_map[shift_type]
+            for d in days:
+                model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
+        elif constraint_type == "only_shift_on_day_type":
+            shift_type = constraint["shift_type"]
+            day_type = constraint["day_type"]
+            shift_map = {"morning": 0, "afternoon": 1, "night": 2}
+            s_idx = shift_map[shift_type]
+
+            for d in all_days:
+                date = datetime.date(year, month, d)
+                is_weekend = date.weekday() >= 5 # Saturday or Sunday
+
+                if day_type == "weekend" and not is_weekend:
+                    # If it's a weekday, consultant cannot do this shift type
+                    model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
+                elif day_type == "weekday" and is_weekend:
+                    # If it's a weekend, consultant cannot do this shift type
+                    model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
+
+def generate_roster_cp(year, month, vacations, monthly_constraints=None):
     """
     Generates a duty roster for the given year and month using the CP-SAT solver.
     """
@@ -105,6 +138,10 @@ def generate_roster_cp(year, month, vacations):
         for d in all_days:
             model.Add(sum(shifts[(c, d, s)] for s in all_shifts) <= 1)
 
+    # Apply monthly specific constraints if any
+    if monthly_constraints:
+        apply_monthly_constraints(model, shifts, CONSULTANTS, all_days, all_shifts, year, month, monthly_constraints)
+
     # Shift size constraints
     for d in all_days:
         model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) == 3) # Morning shift is 3 people
@@ -126,6 +163,18 @@ def generate_roster_cp(year, month, vacations):
     senior_indices = [i for i, c in enumerate(CONSULTANTS) if c.is_senior]
     for d in all_days:
         model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
+
+    # No two female consultants on night shift
+    female_indices = [i for i, c in enumerate(CONSULTANTS) if c.gender == 'Female']
+    for d in all_days:
+        model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
+
+    # Mittal cannot do Monday and Wednesday night duties
+    mittal_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MT'][0]
+    for d in all_days:
+        date = datetime.date(year, month, d)
+        if date.weekday() == 0 or date.weekday() == 2: # Monday or Wednesday
+            model.Add(shifts[(mittal_index, d, 2)] == 0)
 
     # Post-night duty
     for c in all_consultants:
@@ -155,6 +204,18 @@ def generate_roster_cp(year, month, vacations):
     for c in all_consultants:
         for d in range(1, num_days - 3):
             model.Add(sum(shifts[(c, i, s)] for i in range(d, d + 5) for s in all_shifts) >= 1)
+
+    # Duty hours must not exceed 200 hours
+    cl_days_per_consultant = {c.initial: 0 for c in CONSULTANTS}
+    if monthly_constraints:
+        for constraint in monthly_constraints:
+            if constraint["type"] == "casual_leave":
+                cl_days_per_consultant[constraint["consultant_initial"]] += constraint["num_days"]
+
+    for c_idx, c in enumerate(CONSULTANTS):
+        total_hours = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
+        adjusted_max_hours = 200 - (cl_days_per_consultant[c.initial] * 8)
+        model.Add(total_hours <= adjusted_max_hours)
 
     # --- Define Soft Constraints (Objectives) ---
 
@@ -284,6 +345,7 @@ if __name__ == '__main__':
     parser.add_argument('-y', '--year', type=int, default=datetime.datetime.now().year, help='The year for the roster.')
     parser.add_argument('-m', '--month', type=int, default=datetime.datetime.now().month, help='The month for the roster.')
     parser.add_argument('--vacations-file', type=str, required=True, help='Path to the vacation data file (JSON format).')
+    parser.add_argument('--monthly-constraints-file', type=str, help='Path to a JSON file with monthly specific constraints.')
     args = parser.parse_args()
 
     # Read and parse the vacation file
@@ -297,6 +359,11 @@ if __name__ == '__main__':
             datetime.datetime.strptime(d, '%Y-%m-%d').date() for d in req['dates']
         ]
 
-    roster = generate_roster_cp(args.year, args.month, vacations_dict)
+    monthly_constraints = None
+    if args.monthly_constraints_file:
+        with open(args.monthly_constraints_file, 'r') as f:
+            monthly_constraints = json.load(f)
+
+    roster = generate_roster_cp(args.year, args.month, vacations_dict, monthly_constraints)
     print_roster(roster, args.year, args.month)
     print_statistics(roster, args.year, args.month)

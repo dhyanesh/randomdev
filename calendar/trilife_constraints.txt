@@ -1,6 +1,6 @@
 1. At least one senior consultant must be present for night duty.
 2. Everyone has at least 6 nights except for Mohan who has 4 nights.
-3. Each consultant will attempt to complete 192 working hours.
+3. Each consultant's duty hours must not exceed 192 hours.
 4. There cannot be more than 4 consecutive leaves for any consultant.
 5. After a night duty, there cannot be subsequent morning or afternoon shifts.
 6. Make provision for the script to allow specifying vacation days for consultants.
@@ -10,3 +10,4 @@
 10. There should be 1 or 0 consultants in the afternoon shift (zero on Sundays).
 11. There should be 2 consultants for the night shift.
 12. AM and SJ cannot do Afternoon shifts.
+13. No two female consultants can be on the night shift together.
