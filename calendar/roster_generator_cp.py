@@ -1,3 +1,60 @@
+"""
+This script generates a monthly duty roster for a team of consultants using the Google OR-Tools CP-SAT solver.
+
+The script takes into account a set of hard and soft constraints to create a fair and balanced roster.
+
+**Technologies:**
+- Google OR-Tools CP-SAT Solver: For solving the constraint satisfaction problem.
+- Python: The programming language used.
+
+**Hard Constraints:**
+1.  A consultant can work at most one shift per day.
+2.  Morning shifts have 3 people, afternoon shifts have 1 person (on weekdays), and night shifts have 2 people.
+3.  Specific consultants (AM and SJ) are exempt from afternoon shifts.
+4.  Night shifts must have at least one senior consultant.
+5.  A consultant cannot have a morning or afternoon shift the day after a night shift.
+6.  Consultants' vacation requests are respected.
+7.  One consultant (MH) has a fixed quota of 4 night shifts per month.
+8.  Other consultants have a night shift quota of 5 to 7 nights per month.
+9.  Consultants cannot have more than 4 consecutive days off.
+
+**Soft Constraints (Objectives to Minimize):**
+1.  **Weekend Fairness:** Minimize the difference in the number of weekend shifts worked among all consultants.
+2.  **Working Hours Fairness:** Minimize the difference in total monthly working hours among all consultants.
+3.  **Night Shift Fairness:** Minimize the difference in the number of night shifts worked among consultants (excluding MH).
+
+**Usage:**
+The script is run from the command line with the year, month, and a path to a JSON file containing vacation data.
+
+**Command:**
+```bash
+python roster_generator_cp.py -y <year> -m <month> --vacations-file <path_to_vacations.json>
+```
+
+**Arguments:**
+- `-y`, `--year`: The year for the roster (e.g., 2025).
+- `-m`, `--month`: The month for the roster (e.g., 9).
+- `--vacations-file`: The path to the JSON file with vacation data.
+
+**Vacation File Format (`vacations.json`):**
+The JSON file should contain a list of vacation requests, where each request specifies the consultant's initial and a list of dates they will be unavailable.
+
+**Example `vacations.json`:**
+```json
+{
+  "requests": [
+    {
+      "consultant_initial": "PK",
+      "dates": ["2025-09-05", "2025-09-06"]
+    },
+    {
+      "consultant_initial": "MNS",
+      "dates": ["2025-09-10"]
+    }
+  ]
+}
+```
+"""
 from __future__ import print_function
 from ortools.sat.python import cp_model
 import calendar
