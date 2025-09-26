@@ -14,6 +14,14 @@ The project automates the creation of monthly duty rosters for a team of consult
 
 ### Building and Running
 
+**Environment Setup:**
+
+Before running any scripts, activate the Python virtual environment:
+
+```bash
+source venv/bin/activate
+```
+
 **1. Roster Generation:**
 
 The `roster_generator_cp.py` script generates a duty roster.
@@ -21,13 +29,15 @@ The `roster_generator_cp.py` script generates a duty roster.
 **Prerequisites:**
 
 *   Python 3
-*   Required libraries: `ortools`, `gspread`, `google-auth-oauthlib`.
-*   A `your_service_account_file.json` file with Google Cloud service account credentials (required for Google Sheets export).
+*   OR-Tools library (`pip install ortools`)
+*   For Google Sheets export:
+    *   `gspread` and `google-auth-oauthlib` libraries (`pip install gspread google-auth-oauthlib`)
+    *   A `your_service_account_file.json` file with Google Cloud service account credentials.
 
 **Running the script:**
 
 ```bash
-python roster_generator_cp.py -y <year> -m <month> [options]
+python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
