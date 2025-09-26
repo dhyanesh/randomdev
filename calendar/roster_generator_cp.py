@@ -139,6 +139,9 @@ def apply_october_2025_requests(model, shifts, consultants, all_days, all_shifts
     model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) == 6)
     model.Add(sum(shifts[(am_idx, d, 2)] for d in all_days) == 6)
 
+    # Mohan no afternoon shifts
+    model.Add(sum(shifts[(mh_idx, d, 1)] for d in all_days) == 0)
+
     # --- Soft Constraints ("prefer") ---
     positive_preferences = []
     negative_preferences = []
