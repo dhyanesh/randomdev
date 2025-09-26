@@ -21,17 +21,22 @@ The `roster_generator_cp.py` script generates a duty roster.
 **Prerequisites:**
 
 *   Python 3
-*   OR-Tools library (`pip install ortools`)
+*   Required libraries: `ortools`, `gspread`, `google-auth-oauthlib`.
+*   A `your_service_account_file.json` file with Google Cloud service account credentials (required for Google Sheets export).
 
 **Running the script:**
 
 ```bash
-python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
+python roster_generator_cp.py -y <year> -m <month> [options]
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
 *   `<month>`: The month for the roster (e.g., 9).
-*   `--vacations-file`: Path to the JSON file containing vacation data.
+
+**Options:**
+*   `--export-gsheet`: Export the generated roster to a Google Sheet.
+*   `--share-email <email>`: Email address to share the Google Sheet with.
+*   `--force-regenerate`: Force regeneration of the roster, ignoring any cached version.
 
 **2. Trilife Shift Scheduler:**
 
@@ -58,14 +63,13 @@ python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-ca
 
 *   **Testing:** The project uses the `unittest` framework for testing. Test files are `test_roster_generator.py` and `test_trilife_shifts.py`.
 *   **Code Style:** The code is generally well-structured, with classes and functions for different functionalities. The `trilife_shifts.py` script follows a more object-oriented approach.
-*   **Configuration:** The `roster_generator_cp.py` script uses a JSON file for vacation data. The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
+*   **Configuration:** `roster_generator_cp.py` has hardcoded requests for October 2025 and uses a local JSON file for caching (`roster_<year>_<month>.json`). The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
 *   **Dependencies:** The required Python libraries are listed in the "Building and Running" section. A `requirements.txt` file would be a good addition to the project.
 
 ### Key Files
 
-*   `roster_generator_cp.py`: The main script for generating the duty roster using OR-Tools.
+*   `roster_generator_cp.py`: The main script for generating the duty roster using OR-Tools. It supports caching and exporting to Google Sheets.
 *   `trilife_shifts.py`: A script to parse a PDF roster and create a schedule in Google Sheets and Calendar.
 *   `shifts.py`: A simpler, interactive script for creating shift schedules.
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
-*   `vacations.json`: A JSON file containing vacation requests for the consultants.
