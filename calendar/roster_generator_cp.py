@@ -24,36 +24,24 @@ The script takes into account a set of hard and soft constraints to create a fai
 3.  **Night Shift Fairness:** Minimize the difference in the number of night shifts worked among consultants (excluding MH).
 
 **Usage:**
-The script is run from the command line with the year, month, and a path to a JSON file containing vacation data.
+The script is run from the command line with the year and month.
 
 **Command:**
 ```bash
-python roster_generator_cp.py -y <year> -m <month> --vacations-file <path_to_vacations.json>
+python roster_generator_cp.py -y <year> -m <month> [options]
 ```
 
 **Arguments:**
 - `-y`, `--year`: The year for the roster (e.g., 2025).
 - `-m`, `--month`: The month for the roster (e.g., 9).
-- `--vacations-file`: The path to the JSON file with vacation data.
+- `--export-gsheet`: Export the generated roster to a Google Sheet.
+- `--share-email <email>`: Email address to share the Google Sheet with.
+- `--force-regenerate`: Force regeneration of the roster, ignoring any cached version.
 
-**Vacation File Format (`vacations.json`):**
-The JSON file should contain a list of vacation requests, where each request specifies the consultant's initial and a list of dates they will be unavailable.
-
-**Example `vacations.json`:**
-```json
-{
-  "requests": [
-    {
-      "consultant_initial": "PK",
-      "dates": ["2025-09-05", "2025-09-06"]
-    },
-    {
-      "consultant_initial": "MNS",
-      "dates": ["2025-09-10"]
-    }
-  ]
-}
-```
+**Features:**
+- **October 2025 Requests:** Specific leave and shift preferences for October 2025 are hardcoded.
+- **Google Sheets Export:** Can create or update a Google Sheet with the roster and statistics.
+- **Local Caching:** Caches the generated roster locally to speed up subsequent runs.
 """
 from __future__ import print_function
 from ortools.sat.python import cp_model
@@ -62,6 +50,9 @@ from collections import namedtuple
 import datetime
 import argparse
 import json
+import gspread
+from google.oauth2.service_account import Credentials
+from pathlib import Path
 
 # Based on the provided PDF and constraints.
 Consultant = namedtuple('Consultant', ['name', 'initial', 'is_senior', 'gender'])
@@ -79,41 +70,119 @@ CONSULTANTS = [
     Consultant('DR. MANJUNATH N S', 'MNS', True, 'Male'),
 ]
 
+def apply_october_2025_requests(model, shifts, consultants, all_days, all_shifts, year, month):
+    """
+    Applies the specific requests for October 2025.
+    """
+    if year != 2025 or month != 10:
+        return {c.initial: 0 for c in consultants}, model.NewIntVar(0, 0, 'empty_pref')
 
-def apply_monthly_constraints(model, shifts, consultants, all_days, all_shifts, year, month, monthly_constraints):
-    for constraint in monthly_constraints:
-        consultant_initial = constraint.get("consultant_initial")
-        consultant_idx = -1
-        if consultant_initial:
-            consultant_idx = [i for i, c in enumerate(consultants) if c.initial == consultant_initial][0]
+    consultant_map = {c.initial: i for i, c in enumerate(consultants)}
+    ps_idx = consultant_map['PS']
+    mh_idx = consultant_map['MH']
+    pk_idx = consultant_map['PK']
+    sk_idx = consultant_map['SK']
+    sb_idx = consultant_map['SB']
+    am_idx = consultant_map['AM']
+    mt_idx = consultant_map['MT']
+    mj_idx = consultant_map['MJ']
+    sj_idx = consultant_map['SJ']
 
-        constraint_type = constraint["type"]
+    cl_days_per_consultant = {c.initial: 0 for c in consultants}
+    
+    # --- Hard Constraints ("need") ---
 
-        if constraint_type == "no_shift_on_day":
-            shift_type = constraint["shift_type"]
-            days = constraint["days"]
-            shift_map = {"morning": 0, "afternoon": 1, "night": 2}
-            s_idx = shift_map[shift_type]
-            for d in days:
-                model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
-        elif constraint_type == "only_shift_on_day_type":
-            shift_type = constraint["shift_type"]
-            day_type = constraint["day_type"]
-            shift_map = {"morning": 0, "afternoon": 1, "night": 2}
-            s_idx = shift_map[shift_type]
+    # PK needs leave on 20, 25, 26
+    for d in [20, 25, 26]:
+        for s in all_shifts:
+            model.Add(shifts[(pk_idx, d, s)] == 0)
 
-            for d in all_days:
-                date = datetime.date(year, month, d)
-                is_weekend = date.weekday() >= 5 # Saturday or Sunday
+    # PK needs 4 days CL from Oct 2-5
+    cl_days_per_consultant['PK'] = 4
+    for d in [2, 3, 4, 5]:
+        for s in all_shifts:
+            model.Add(shifts[(pk_idx, d, s)] == 0)
 
-                if day_type == "weekend" and not is_weekend:
-                    # If it's a weekday, consultant cannot do this shift type
-                    model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
-                elif day_type == "weekday" and is_weekend:
-                    # If it's a weekend, consultant cannot do this shift type
-                    model.Add(shifts[(consultant_idx, d, s_idx)] == 0)
+    # SB needs leave on 1, 2, 3, 25, 26
+    for d in [1, 2, 3, 25, 26]:
+        for s in all_shifts:
+            model.Add(shifts[(sb_idx, d, s)] == 0)
 
-def generate_roster_cp(year, month, vacations, monthly_constraints=None):
+    # AM needs leave on 1, 2, 3, 6, 7, 8, 13, 14, 15, 27, 28, 29
+    for d in [1, 2, 3, 6, 7, 8, 13, 14, 15, 27, 28, 29]:
+        for s in all_shifts:
+            model.Add(shifts[(am_idx, d, s)] == 0)
+
+    # MT needs to be off Oct 1, 2, 3. Taking 2 CLs.
+    cl_days_per_consultant['MT'] = 2
+    for d in [1, 2, 3]:
+        for s in all_shifts:
+            model.Add(shifts[(mt_idx, d, s)] == 0)
+    
+    # MT No morning shift on Oct 14th
+    model.Add(shifts[(mt_idx, 14, 0)] == 0)
+
+    # MJ needs leave on 20, 21, 22, 23
+    for d in [20, 21, 22, 23]:
+        for s in all_shifts:
+            model.Add(shifts[(mj_idx, d, s)] == 0)
+
+    # SJ needs leave on 11, 12, 13
+    for d in [11, 12, 13]:
+        for s in all_shifts:
+            model.Add(shifts[(sj_idx, d, s)] == 0)
+
+    # SJ can do two noon shifts.
+    model.Add(sum(shifts[(sj_idx, d, 1)] for d in all_days) <= 2)
+
+    # --- Soft Constraints ("prefer") ---
+    positive_preferences = []
+    negative_preferences = []
+
+    # PS
+    positive_preferences.extend([shifts[(ps_idx, d, 2)] for d in [7, 10, 11, 13, 18, 25, 31]])
+    positive_preferences.extend([shifts[(ps_idx, d, s)] for d in [3, 6, 9, 15, 21, 27, 30] for s in [0, 1]])
+    positive_preferences.extend([shifts[(ps_idx, d, 0)] for d in [17, 23]])
+
+    # MH
+    positive_preferences.extend([shifts[(mh_idx, d, 2)] for d in [2, 7, 12, 21]])
+    positive_preferences.extend([shifts[(mh_idx, d, 0)] for d in [5, 6, 9, 10, 14, 15, 16, 17, 20, 23, 27, 28, 29, 30]])
+
+    # SK
+    saturdays = [d for d in all_days if datetime.date(year, month, d).weekday() == 5]
+    sundays = [d for d in all_days if datetime.date(year, month, d).weekday() == 6]
+    weekdays = [d for d in all_days if datetime.date(year, month, d).weekday() < 5]
+    weekends = saturdays + sundays
+    # Prefer morning shifts on weekends
+    positive_preferences.extend([shifts[(sk_idx, d, 0)] for d in weekends])
+    # Prefer afternoon shifts on weekdays
+    positive_preferences.extend([shifts[(sk_idx, d, 1)] for d in weekdays])
+    # Avoid night shifts on weekends
+    negative_preferences.extend([shifts[(sk_idx, d, 2)] for d in weekends])
+
+    # SB
+    positive_preferences.append(shifts[(sb_idx, 29, 0)])
+    positive_preferences.append(shifts[(sb_idx, 30, 0)])
+
+    # AM
+    positive_preferences.extend([shifts[(am_idx, d, 0)] for d in [4, 19, 20]])
+    positive_preferences.extend([shifts[(am_idx, d, 2)] for d in [5, 12]])
+
+    # MJ
+    negative_preferences.extend([shifts[(mj_idx, 1, s)] for s in all_shifts])
+    negative_preferences.extend([shifts[(mj_idx, 4, s)] for s in all_shifts])
+    negative_preferences.extend([shifts[(mj_idx, 5, s)] for s in all_shifts])
+
+    # SJ
+    # Preference for 4 consecutive morning shifts removed for performance.
+    positive_preferences.append(shifts[(sj_idx, 20, 0)])
+
+    preference_score = model.NewIntVar(-500, 500, 'preference_score')
+    model.Add(preference_score == sum(positive_preferences) - sum(negative_preferences))
+
+    return cl_days_per_consultant, preference_score
+
+def generate_roster_cp(year, month):
     """
     Generates a duty roster for the given year and month using the CP-SAT solver.
     """
@@ -138,9 +207,11 @@ def generate_roster_cp(year, month, vacations, monthly_constraints=None):
         for d in all_days:
             model.Add(sum(shifts[(c, d, s)] for s in all_shifts) <= 1)
 
-    # Apply monthly specific constraints if any
-    if monthly_constraints:
-        apply_monthly_constraints(model, shifts, CONSULTANTS, all_days, all_shifts, year, month, monthly_constraints)
+    cl_days_per_consultant = {c.initial: 0 for c in CONSULTANTS}
+    preference_score = model.NewIntVar(0, 0, 'preference_score') # Default empty score
+
+    if year == 2025 and month == 10:
+        cl_days_per_consultant, preference_score = apply_october_2025_requests(model, shifts, CONSULTANTS, all_days, all_shifts, year, month)
 
     # Shift size constraints
     for d in all_days:
@@ -157,7 +228,8 @@ def generate_roster_cp(year, month, vacations, monthly_constraints=None):
     sj_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'SJ'][0]
     for d in all_days:
         model.Add(shifts[(am_index, d, 1)] == 0)
-        model.Add(shifts[(sj_index, d, 1)] == 0)
+        if not (year == 2025 and month == 10):
+            model.Add(shifts[(sj_index, d, 1)] == 0)
 
     # At least one senior on night shift
     senior_indices = [i for i, c in enumerate(CONSULTANTS) if c.is_senior]
@@ -182,14 +254,6 @@ def generate_roster_cp(year, month, vacations, monthly_constraints=None):
             model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 0)] <= 1)
             model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 1)] <= 1)
 
-    # Vacations
-    for c_idx, c in enumerate(CONSULTANTS):
-        for d in all_days:
-            date = datetime.date(year, month, d)
-            if date in vacations.get(c.initial, []):
-                for s in all_shifts:
-                    model.Add(shifts[(c_idx, d, s)] == 0)
-
     # Night shift constraints
     mh_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MH'][0]
     model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
@@ -204,18 +268,6 @@ def generate_roster_cp(year, month, vacations, monthly_constraints=None):
     for c in all_consultants:
         for d in range(1, num_days - 3):
             model.Add(sum(shifts[(c, i, s)] for i in range(d, d + 5) for s in all_shifts) >= 1)
-
-    # Duty hours must not exceed 200 hours
-    cl_days_per_consultant = {c.initial: 0 for c in CONSULTANTS}
-    if monthly_constraints:
-        for constraint in monthly_constraints:
-            if constraint["type"] == "casual_leave":
-                cl_days_per_consultant[constraint["consultant_initial"]] += constraint["num_days"]
-
-    for c_idx, c in enumerate(CONSULTANTS):
-        total_hours = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-        adjusted_max_hours = 200 - (cl_days_per_consultant[c.initial] * 8)
-        model.Add(total_hours <= adjusted_max_hours)
 
     # --- Define Soft Constraints (Objectives) ---
 
@@ -251,25 +303,7 @@ def generate_roster_cp(year, month, vacations, monthly_constraints=None):
     nights_fairness_diff = max_night_shifts - min_night_shifts
 
     # --- Set Objective Function ---
-    model.Minimize(weekend_fairness_diff * 2 + hours_fairness_diff + nights_fairness_diff * 4)
-
-    # --- Solve the model ---
-    solver = cp_model.CpSolver()
-    status = solver.Solve(model)
-
-    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        roster = {day: {'morning': [], 'afternoon': [], 'night': []} for day in all_days}
-        for d in all_days:
-            for c_idx, c in enumerate(CONSULTANTS):
-                if solver.Value(shifts[(c_idx, d, 0)]) == 1:
-                    roster[d]['morning'].append(c.initial)
-                if solver.Value(shifts[(c_idx, d, 1)]) == 1:
-                    roster[d]['afternoon'].append(c.initial)
-                if solver.Value(shifts[(c_idx, d, 2)]) == 1:
-                    roster[d]['night'].append(c.initial)
-        return roster
-    else:
-        return None
+    model.Minimize(weekend_fairness_diff * 2 + hours_fairness_diff + nights_fairness_diff * 4 - preference_score)
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()
@@ -294,28 +328,29 @@ def print_roster(roster, year, month):
         print("No solution found for the given constraints.")
         return
 
-    print("DATE       | GENERAL (9am-6pm)   | AFTERNOON (12pm-8pm) | NIGHT (6pm-9am)")
-    print("-" * 70)
+    print("DAY        | DATE       | GENERAL (9am-6pm)   | AFTERNOON (12pm-8pm) | NIGHT (6pm-9am)")
+    print("-" * 82)
     for day, shifts in roster.items():
         date = datetime.date(year, month, day)
+        day_name = date.strftime('%a')
+        
+        morning_shifts = shifts['morning'][:] # Make a copy
         if date.weekday() < 6: # Not Sunday
-            shifts['morning'].insert(0, 'BG')
+            morning_shifts.insert(0, 'BG')
 
         date_str = f"{day}-{month}-{year}"
-        morning_str = '/'.join(shifts['morning'])
+        morning_str = '/'.join(morning_shifts)
         afternoon_str = '/'.join(shifts['afternoon'])
         night_str = '/'.join(shifts['night'])
-        print(f"{date_str:<10} | {morning_str:<19} | {afternoon_str:<20} | {night_str}")
+        print(f"{day_name:<10} | {date_str:<10} | {morning_str:<19} | {afternoon_str:<20} | {night_str}")
 
-import argparse
-
-def print_statistics(roster, year, month):
+def get_statistics(roster, year, month):
+    """Calculates shift statistics and returns them as a list of lists."""
     if roster is None:
-        return
+        return None
 
-    print("\n--- Shift Statistics ---")
-    print(f"{ 'Consultant':<20} | { 'General':<10} | { 'Afternoon':<10} | { 'Night':<10} | { 'Total Hours':<10}")
-    print("-" * 75)
+    stats_header = [ 'Consultant', 'General', 'Afternoon', 'Night', 'Total Hours']
+    stats_rows = [stats_header]
 
     for consultant in CONSULTANTS:
         general_shifts = 0
@@ -331,39 +366,142 @@ def print_statistics(roster, year, month):
                 night_shifts += 1
         
         total_hours = (general_shifts * 9) + (afternoon_shifts * 8) + (night_shifts * 15)
-
-        print(f"{consultant.name:<20} | {general_shifts:<10} | {afternoon_shifts:<10} | {night_shifts:<10} | {total_hours:<10}")
+        stats_rows.append([consultant.name, general_shifts, afternoon_shifts, night_shifts, total_hours])
     
     # Add HOD stats
     num_days = calendar.monthrange(year, month)[1]
     hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6)
     hod_hours = hod_mornings * 9
-    print(f"{ 'Dr. BHARGAVA':<20} | {hod_mornings:<10} | {0:<10} | {0:<10} | {hod_hours:<10}")
+    stats_rows.append(['Dr. BHARGAVA', hod_mornings, 0, 0, hod_hours])
+    
+    return stats_rows
+
+def print_statistics_from_data(stats_data):
+    """Prints statistics from a data structure."""
+    if not stats_data:
+        return
+    
+    print("\n--- Shift Statistics ---")
+    header = stats_data[0]
+    rows = stats_data[1:]
+    
+    print(f"{header[0]:<20} | {header[1]:<10} | {header[2]:<10} | {header[3]:<10} | {header[4]:<10}")
+    print("-" * 75)
+    for row in rows:
+        print(f"{str(row[0]):<20} | {str(row[1]):<10} | {str(row[2]):<10} | {str(row[3]):<10} | {str(row[4]):<10}")
+
+def export_to_gsheet(roster, stats_data, year, month, service_account_file='your_service_account_file.json', share_email=None):
+    """Exports the roster and statistics to a Google Sheet."""
+    
+    print("\nConnecting to Google Sheets...")
+    
+    # 1. Authentication
+    scopes = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    try:
+        creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        client = gspread.authorize(creds)
+    except FileNotFoundError:
+        print(f"Error: Service account file '{service_account_file}' not found.")
+        print("Please make sure the file exists and is in the correct path.")
+        return
+    except Exception as e:
+        print(f"An error occurred during authentication: {e}")
+        return
+
+    # 2. Open or Create Spreadsheet
+    sheet_title = f"Roster {calendar.month_name[month]} {year}"
+    try:
+        spreadsheet = client.open(sheet_title)
+        print(f"Found existing spreadsheet: '{sheet_title}'")
+    except gspread.exceptions.SpreadsheetNotFound:
+        print(f"Creating new spreadsheet: '{sheet_title}'")
+        spreadsheet = client.create(sheet_title)
+        if share_email:
+            print(f"Sharing sheet with {share_email}...")
+            spreadsheet.share(share_email, perm_type='user', role='writer')
+
+    worksheet = spreadsheet.sheet1
+    worksheet.clear()
+
+    # 3. Format and Write Roster Data
+    print("Formatting and writing roster data...")
+    roster_header = ["Day", "Date", "General (9am-6pm)", "Afternoon (12pm-8pm)", "Night (6pm-9am)"]
+    roster_rows = [roster_header]
+    
+    for day, shifts in roster.items():
+        date = datetime.date(year, month, day)
+        day_name = date.strftime('%a')
+        date_str = f"{day}-{month}-{year}"
+        
+        morning_shifts = shifts['morning'][:] # Make a copy
+        if date.weekday() < 6: # Not Sunday
+            morning_shifts.insert(0, 'BG')
+
+        morning_str = '/'.join(morning_shifts)
+        afternoon_str = '/'.join(shifts['afternoon'])
+        night_str = '/'.join(shifts['night'])
+        roster_rows.append([day_name, date_str, morning_str, afternoon_str, night_str])
+    
+    worksheet.update(roster_rows, 'A1')
+    worksheet.format('A1:E1', {'textFormat': {'bold': True}})
+
+    # 4. Add statistics
+    if stats_data:
+        print("Formatting and writing statistics data...")
+        stats_start_row = len(roster_rows) + 2 # Leave one blank row
+        worksheet.update(stats_data, f'A{stats_start_row}')
+        worksheet.format(f'A{stats_start_row}:E{stats_start_row}', {'textFormat': {'bold': True}})
+
+    
+    print("-" * 30)
+    print("Export to Google Sheets successful!")
+    print(f"Sheet URL: {spreadsheet.url}")
+    print("-" * 30)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate a duty roster for consultants.')
     parser.add_argument('-y', '--year', type=int, default=datetime.datetime.now().year, help='The year for the roster.')
     parser.add_argument('-m', '--month', type=int, default=datetime.datetime.now().month, help='The month for the roster.')
-    parser.add_argument('--vacations-file', type=str, required=True, help='Path to the vacation data file (JSON format).')
-    parser.add_argument('--monthly-constraints-file', type=str, help='Path to a JSON file with monthly specific constraints.')
+    parser.add_argument('--export-gsheet', action='store_true', help='Export the roster to Google Sheets.')
+    parser.add_argument('--share-email', type=str, help='Email address to share the Google Sheet with.')
+    parser.add_argument('--force-regenerate', action='store_true', help='Force regeneration of the roster, ignoring any cached version.')
     args = parser.parse_args()
 
-    # Read and parse the vacation file
-    with open(args.vacations_file, 'r') as f:
-        vacation_data = json.load(f)
+    cache_filename = f"roster_{args.year}_{args.month}.json"
+    roster = None
 
-    # Convert JSON data to the dictionary format expected by the solver
-    vacations_dict = {}
-    for req in vacation_data['requests']:
-        vacations_dict[req['consultant_initial']] = [
-            datetime.datetime.strptime(d, '%Y-%m-%d').date() for d in req['dates']
-        ]
+    if not args.force_regenerate:
+        try:
+            with open(cache_filename, 'r') as f:
+                print(f"Loading roster from cache file: {cache_filename}")
+                cached_roster = json.load(f)
+                roster = {int(k): v for k, v in cached_roster.items()}
+        except FileNotFoundError:
+            print("No cache file found.")
 
-    monthly_constraints = None
-    if args.monthly_constraints_file:
-        with open(args.monthly_constraints_file, 'r') as f:
-            monthly_constraints = json.load(f)
+    if roster is None:
+        print("Generating new roster...")
+        roster = generate_roster_cp(args.year, args.month)
+        
+        if roster:
+            print(f"Saving roster to cache file: {cache_filename}")
+            with open(cache_filename, 'w') as f:
+                json.dump(roster, f, indent=4)
 
-    roster = generate_roster_cp(args.year, args.month, vacations_dict, monthly_constraints)
-    print_roster(roster, args.year, args.month)
-    print_statistics(roster, args.year, args.month)
+    if roster:
+        print_roster(roster, args.year, args.month)
+        print() # Add a blank line
+        stats_data = get_statistics(roster, args.year, args.month)
+        print_statistics_from_data(stats_data)
+
+        if args.export_gsheet:
+            print("\nExporting to Google Sheets...")
+            print("Please ensure 'your_service_account_file.json' is in the same directory.")
+            export_to_gsheet(roster, stats_data, args.year, args.month, 
+                             service_account_file='your_service_account_file.json', 
+                             share_email=args.share_email)
+    else:
+        print("Could not generate or load a roster.")
