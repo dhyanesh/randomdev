@@ -135,6 +135,10 @@ def apply_october_2025_requests(model, shifts, consultants, all_days, all_shifts
     # SJ can do two noon shifts.
     model.Add(sum(shifts[(sj_idx, d, 1)] for d in all_days) <= 2)
 
+    # Mittal and Amritha nights constraint
+    model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) == 6)
+    model.Add(sum(shifts[(am_idx, d, 2)] for d in all_days) == 6)
+
     # --- Soft Constraints ("prefer") ---
     positive_preferences = []
     negative_preferences = []
@@ -258,8 +262,12 @@ def generate_roster_cp(year, month):
     mh_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MH'][0]
     model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
 
+    oct_2025_special_nights = []
+    if year == 2025 and month == 10:
+        oct_2025_special_nights = ['MT', 'AM']
+
     for c_idx, c in enumerate(CONSULTANTS):
-        if c.initial != 'MH':
+        if c.initial != 'MH' and c.initial not in oct_2025_special_nights:
             num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
             model.Add(num_nights >= 5)
             model.Add(num_nights <= 7)
