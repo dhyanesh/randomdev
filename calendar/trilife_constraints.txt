@@ -6,7 +6,7 @@
 6. Make provision for the script to allow specifying vacation days for consultants.
 7. Make sure weekends are fairly divided.
 8. BG is the HOD and always does all mornings except Sundays or requested vacations.
-9. There should be 3 consultants (excluding the HOD) in the morning shift.
+9. There should be 2 or 3 consultants (excluding the HOD) in the morning shift.
 10. There should be 1 or 0 consultants in the afternoon shift (zero on Sundays).
 11. There should be 2 consultants for the night shift.
 12. AM and SJ cannot do Afternoon shifts.

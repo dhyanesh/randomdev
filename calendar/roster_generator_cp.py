@@ -17,6 +17,7 @@ The script takes into account a set of hard and soft constraints to create a fai
 7.  One consultant (MH) has a fixed quota of 4 night shifts per month.
 8.  Other consultants have a night shift quota of 5 to 7 nights per month.
 9.  Consultants cannot have more than 4 consecutive days off.
+10. Total monthly working hours for each consultant should not exceed 192.
 
 **Soft Constraints (Objectives to Minimize):**
 1.  **Weekend Fairness:** Minimize the difference in the number of weekend shifts worked among all consultants.
@@ -107,7 +108,8 @@ def generate_roster_cp(year, month):
 
     # Shift size constraints
     for d in all_days:
-        model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) == 3) # Morning shift is 3 people
+        model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) >= 2) # Morning shift is 2 or 3 people
+        model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) <= 3)
         date = datetime.date(year, month, d)
         if date.weekday() < 6:
             model.Add(sum(shifts[(c, d, 1)] for c in all_consultants) == 1) # Afternoon
@@ -179,9 +181,12 @@ def generate_roster_cp(year, month):
     # 2. Working Hours Fairness Preference
     all_total_hours = []
     for c_idx, c in enumerate(CONSULTANTS):
-        total_hours = model.NewIntVar(0, 300, f'total_hours_c{c_idx}')
-        model.Add(total_hours == sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days))
-        all_total_hours.append(total_hours)
+        total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
+        model.Add(total_hours_expr <= 192)
+        
+        total_hours_var = model.NewIntVar(0, 192, f'total_hours_c{c_idx}') # Upper bound can be 192
+        model.Add(total_hours_var == total_hours_expr)
+        all_total_hours.append(total_hours_var)
 
     min_total_hours = model.NewIntVar(0, 300, 'min_total_hours')
     max_total_hours = model.NewIntVar(0, 300, 'max_total_hours')
