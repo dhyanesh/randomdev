@@ -135,6 +135,11 @@ def generate_roster_cp(year, month):
     for d in all_days:
         model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
 
+    # AM and MH cannot work together in night
+    mh_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MH'][0]
+    for d in all_days:
+        model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
+
     # Mittal cannot do Monday and Wednesday night duties
     mittal_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MT'][0]
     for d in all_days:
