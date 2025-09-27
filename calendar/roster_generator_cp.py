@@ -206,8 +206,19 @@ def generate_roster_cp(year, month):
     model.AddMaxEquality(max_night_shifts, night_shifts_per_consultant)
     nights_fairness_diff = max_night_shifts - min_night_shifts
 
+    # 4. Consecutive Night Shift Preference
+    consecutive_night_vars = []
+    for c in all_consultants:
+        for d in all_days[:-1]:
+            lit1 = shifts[(c, d, 2)]
+            lit2 = shifts[(c, d + 1, 2)]
+            consecutive = model.NewBoolVar(f'consecutive_c{c}_d{d}')
+            model.AddBoolAnd([lit1, lit2]).OnlyEnforceIf(consecutive)
+            model.AddBoolOr([lit1.Not(), lit2.Not()]).OnlyEnforceIf(consecutive.Not())
+            consecutive_night_vars.append(consecutive)
+
     # --- Set Objective Function ---
-    model.Minimize(weekend_fairness_diff * 4 + total_hours_deviation + nights_fairness_diff * 4 - preference_score)
+    model.Minimize(weekend_fairness_diff * 4 + total_hours_deviation + nights_fairness_diff * 4 - preference_score + sum(consecutive_night_vars) * 10)
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()
