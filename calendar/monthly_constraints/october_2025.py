@@ -44,6 +44,8 @@ class October2025Constraints(MonthlyConstraints):
 
         # MT needs to be off Oct 1, 2, 3. Taking 2 CLs.
         cl_days_per_consultant['MT'] = 2
+        cl_days_per_consultant['MH'] = 2
+        cl_days_per_consultant['AM'] = 2
         for d in [1, 2, 3]:
             for s in all_shifts:
                 model.Add(shifts[(mt_idx, d, s)] == 0)
@@ -65,8 +67,8 @@ class October2025Constraints(MonthlyConstraints):
         model.Add(sum(shifts[(sj_idx, d, 1)] for d in all_days) <= 2)
 
         # Mittal and Amritha nights constraint
-        model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) == 6)
-        model.Add(sum(shifts[(am_idx, d, 2)] for d in all_days) == 6)
+        model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) <= 6)
+        model.Add(sum(shifts[(am_idx, d, 2)] for d in all_days) <= 6)
 
         # Mohan no afternoon shifts
         model.Add(sum(shifts[(mh_idx, d, 1)] for d in all_days) == 0)

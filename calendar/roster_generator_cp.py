@@ -17,11 +17,11 @@ The script takes into account a set of hard and soft constraints to create a fai
 7.  One consultant (MH) has a fixed quota of 4 night shifts per month.
 8.  Other consultants have a night shift quota of 5 to 7 nights per month.
 9.  Consultants cannot have more than 4 consecutive days off.
-10. Total monthly working hours for each consultant should not exceed 192.
+10. Total monthly working hours for each consultant should be within 16 hours of their target (192, reduced by 8 hours for each day of CL).
 
 **Soft Constraints (Objectives to Minimize):**
 1.  **Weekend Fairness:** Minimize the difference in the number of weekend shifts worked among all consultants.
-2.  **Working Hours Fairness:** Minimize the difference in total monthly working hours among all consultants.
+2.  **Working Hours Target:** Try to keep each consultant's total hours close to their target (192 adjusted for CL).
 3.  **Night Shift Fairness:** Minimize the difference in the number of night shifts worked among consultants (excluding MH).
 
 **Usage:**
@@ -178,21 +178,24 @@ def generate_roster_cp(year, month):
     model.AddMaxEquality(max_weekend_shifts, weekend_shifts_per_consultant)
     weekend_fairness_diff = max_weekend_shifts - min_weekend_shifts
 
-    # 2. Working Hours Fairness Preference
-    all_total_hours = []
+    # 2. Working Hours Target
+    total_hours_deviations = []
     for c_idx, c in enumerate(CONSULTANTS):
-        total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-        model.Add(total_hours_expr <= 192)
-        
-        total_hours_var = model.NewIntVar(0, 192, f'total_hours_c{c_idx}') # Upper bound can be 192
-        model.Add(total_hours_var == total_hours_expr)
-        all_total_hours.append(total_hours_var)
+        consultant_initial = CONSULTANTS[c_idx].initial
+        cl_days = cl_days_per_consultant.get(consultant_initial, 0)
+        target_hours = 192 - (cl_days * 8)
 
-    min_total_hours = model.NewIntVar(0, 300, 'min_total_hours')
-    max_total_hours = model.NewIntVar(0, 300, 'max_total_hours')
-    model.AddMinEquality(min_total_hours, all_total_hours)
-    model.AddMaxEquality(max_total_hours, all_total_hours)
-    hours_fairness_diff = max_total_hours - min_total_hours
+        total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
+        model.Add(total_hours_expr <= target_hours) # Hard constraint
+        model.Add(total_hours_expr >= target_hours - 16) # Hard constraint with wider window
+        
+        # Soft constraint to be close to target
+        deviation = model.NewIntVar(0, 100, f'deviation_c{c_idx}')
+        model.AddAbsEquality(deviation, total_hours_expr - target_hours)
+        total_hours_deviations.append(deviation)
+
+    total_hours_deviation = model.NewIntVar(0, 1000, 'total_hours_deviation')
+    model.Add(total_hours_deviation == sum(total_hours_deviations))
 
     # 3. Night Shift Fairness Preference
     fair_night_consultants = [i for i, c in enumerate(CONSULTANTS) if c.initial != 'MH']
@@ -204,7 +207,7 @@ def generate_roster_cp(year, month):
     nights_fairness_diff = max_night_shifts - min_night_shifts
 
     # --- Set Objective Function ---
-    model.Minimize(weekend_fairness_diff * 2 + hours_fairness_diff + nights_fairness_diff * 4 - preference_score)
+    model.Minimize(weekend_fairness_diff * 4 + total_hours_deviation + nights_fairness_diff * 4 - preference_score)
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()
@@ -250,6 +253,13 @@ def get_statistics(roster, year, month):
     if roster is None:
         return None
 
+    cl_days_per_consultant = {}
+    if year == 2025 and month == 10:
+        cl_days_per_consultant['PK'] = 4
+        cl_days_per_consultant['MT'] = 2
+        cl_days_per_consultant['MH'] = 2
+        cl_days_per_consultant['AM'] = 2
+
     stats_header = [ 'Consultant', 'General', 'Afternoon', 'Night', 'Total Hours']
     stats_rows = [stats_header]
 
@@ -267,7 +277,13 @@ def get_statistics(roster, year, month):
                 night_shifts += 1
         
         total_hours = (general_shifts * 9) + (afternoon_shifts * 8) + (night_shifts * 15)
-        stats_rows.append([consultant.name, general_shifts, afternoon_shifts, night_shifts, total_hours])
+        
+        cl_days = cl_days_per_consultant.get(consultant.initial, 0)
+        hours_str = f"{total_hours}"
+        if cl_days > 0:
+            hours_str += f" ({cl_days} CL)"
+            
+        stats_rows.append([consultant.name, general_shifts, afternoon_shifts, night_shifts, hours_str])
     
     # Add HOD stats
     num_days = calendar.monthrange(year, month)[1]
