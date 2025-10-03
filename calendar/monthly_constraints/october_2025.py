@@ -53,6 +53,9 @@ class October2025Constraints(MonthlyConstraints):
         # MT No morning shift on Oct 14th
         model.Add(shifts[(mt_idx, 14, 0)] == 0)
 
+        # MT No morning shift on Oct 7th
+        model.Add(shifts[(mt_idx, 7, 0)] == 0)
+
         # MJ needs leave on 20, 21, 22, 23
         for d in [20, 21, 22, 23]:
             for s in all_shifts:
@@ -73,6 +76,39 @@ class October2025Constraints(MonthlyConstraints):
         # Mohan no afternoon shifts
         model.Add(sum(shifts[(mh_idx, d, 1)] for d in all_days) == 0)
 
+        # Mohan needs vacation from 24 to 26th
+        for d in [24, 25, 26]:
+            for s in all_shifts:
+                model.Add(shifts[(mh_idx, d, s)] == 0)
+
+
+        # Mittal: After the 27th, only two consecutive night duties are allowed.
+        # No other duties are permitted for Mittal after the 27th.
+        days_after_27 = range(27, 32)
+
+        # Sum of all shifts for Mittal after 27th is 2
+        model.Add(sum(shifts[(mt_idx, d, s)] for d in days_after_27 for s in all_shifts) == 2)
+        # Sum of night shifts for Mittal after 27th is 2
+        model.Add(sum(shifts[(mt_idx, d, 2)] for d in days_after_27) == 2)
+
+        # The 2 night shifts must be consecutive
+        consecutive_nights_vars = []
+        for d in range(27, 31):
+            v = model.NewBoolVar(f'mt_consecutive_nights_{d}')
+            model.AddBoolAnd([shifts[(mt_idx, d, 2)], shifts[(mt_idx, d + 1, 2)]]).OnlyEnforceIf(v)
+            model.AddBoolOr([shifts[(mt_idx, d, 2)].Not(), shifts[(mt_idx, d + 1, 2)].Not()]).OnlyEnforceIf(v.Not())
+            consecutive_nights_vars.append(v)
+        model.Add(sum(consecutive_nights_vars) == 1)
+
+        # Mohan: Put nights on 7th and 12th. Remove 19th and 25th night. Instead of 18th morning put 6th morning.
+        model.Add(shifts[(mh_idx, 7, 2)] == 1)
+        model.Add(shifts[(mh_idx, 12, 2)] == 1)
+        model.Add(shifts[(mh_idx, 19, 2)] == 0)
+        model.Add(shifts[(mh_idx, 25, 2)] == 0)
+        model.Add(shifts[(mh_idx, 18, 0)] == 0)
+        model.Add(shifts[(mh_idx, 6, 0)] == 1)
+
+
         # --- Soft Constraints ("prefer") ---
         positive_preferences = []
         negative_preferences = []
@@ -83,8 +119,8 @@ class October2025Constraints(MonthlyConstraints):
         positive_preferences.extend([shifts[(ps_idx, d, 0)] for d in [17, 23]])
 
         # MH
-        positive_preferences.extend([shifts[(mh_idx, d, 2)] for d in [2, 7, 12, 21]])
-        positive_preferences.extend([shifts[(mh_idx, d, 0)] for d in [5, 6, 9, 10, 14, 15, 16, 17, 20, 23, 27, 28, 29, 30]])
+        positive_preferences.extend([shifts[(mh_idx, d, 2)] for d in [2, 21]])
+        positive_preferences.extend([shifts[(mh_idx, d, 0)] for d in [5, 9, 10, 14, 15, 16, 17, 20, 23, 27, 28, 29, 30]])
 
         # SK
         saturdays = [d for d in all_days if datetime.date(year, month, d).weekday() == 5]

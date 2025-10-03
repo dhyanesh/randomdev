@@ -47,6 +47,7 @@ python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.js
 *   `--export-gsheet`: Export the generated roster to a Google Sheet.
 *   `--share-email <email>`: Email address to share the Google Sheet with.
 *   `--force-regenerate`: Force regeneration of the roster, ignoring any cached version.
+*   `--fixed-roster <file_path>`: Path to a JSON file with a fixed partial roster.
 
 **2. Trilife Shift Scheduler:**
 
@@ -83,3 +84,4 @@ python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-ca
 *   `shifts.py`: A simpler, interactive script for creating shift schedules.
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
+*   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025. This is used with the `--fixed-roster` argument in `roster_generator_cp.py` to ensure that the specified shifts are not changed during roster generation.

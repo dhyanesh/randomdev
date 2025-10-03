@@ -72,7 +72,7 @@ CONSULTANTS = [
     Consultant('DR. MANJUNATH N S', 'MNS', True, 'Male'),
 ]
 
-def generate_roster_cp(year, month):
+def generate_roster_cp(year, month, fixed_roster_file=None):
     """
     Generates a duty roster for the given year and month using the CP-SAT solver.
     """
@@ -89,6 +89,18 @@ def generate_roster_cp(year, month):
         for d in all_days:
             for s in all_shifts:
                 shifts[(c, d, s)] = model.NewBoolVar(f'shift_c{c}_d{d}_s{s}')
+
+    # --- Apply fixed roster constraints ---
+    if fixed_roster_file:
+        with open(fixed_roster_file, 'r') as f:
+            fixed_roster = json.load(f)
+        for day, day_shifts in fixed_roster.items():
+            d = int(day)
+            for shift_name, consultants in day_shifts.items():
+                s = ['morning', 'afternoon', 'night'].index(shift_name)
+                for consultant_initial in consultants:
+                    c_idx = [i for i, c in enumerate(CONSULTANTS) if c.initial == consultant_initial][0]
+                    model.Add(shifts[(c_idx, d, s)] == 1)
 
     # --- Define Hard Constraints ---
 
@@ -144,8 +156,17 @@ def generate_roster_cp(year, month):
     mittal_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MT'][0]
     for d in all_days:
         date = datetime.date(year, month, d)
+        # For Oct 2025, ignore this constraint on or after 27th
+        if year == 2025 and month == 10 and d >= 27:
+            continue
         if date.weekday() == 0 or date.weekday() == 2: # Monday or Wednesday
             model.Add(shifts[(mittal_index, d, 2)] == 0)
+
+    # Mittal cannot do Sunday morning duties
+    for d in all_days:
+        date = datetime.date(year, month, d)
+        if date.weekday() == 6: # Sunday
+            model.Add(shifts[(mittal_index, d, 0)] == 0)
 
     # Post-night duty
     for c in all_consultants:
@@ -323,7 +344,7 @@ def print_statistics_from_data(stats_data):
     for row in rows:
         print(f"{str(row[0]):<20} | {str(row[1]):<10} | {str(row[2]):<10} | {str(row[3]):<10} | {str(row[4]):<10}")
 
-def export_to_gsheet(roster, stats_data, year, month, service_account_file='your_service_account_file.json', share_email=None):
+def export_to_gsheet(roster, stats_data, year, month, service_account_file='your_service_account_file.json', share_email=None, worksheet_name='Sheet1'):
     """Exports the roster and statistics to a Google Sheet."""
     
     print("\nConnecting to Google Sheets...")
@@ -356,8 +377,13 @@ def export_to_gsheet(roster, stats_data, year, month, service_account_file='your
             print(f"Sharing sheet with {share_email}...")
             spreadsheet.share(share_email, perm_type='user', role='writer')
 
-    worksheet = spreadsheet.sheet1
-    worksheet.clear()
+    try:
+        worksheet = spreadsheet.worksheet(worksheet_name)
+        worksheet.clear()
+        print(f"Found existing worksheet: '{worksheet_name}'. Clearing its content.")
+    except gspread.exceptions.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="100", cols="20")
+        print(f"Created new worksheet: '{worksheet_name}'.")
 
     # 3. Format and Write Roster Data
     print("Formatting and writing roster data...")
@@ -401,6 +427,8 @@ if __name__ == '__main__':
     parser.add_argument('--export-gsheet', action='store_true', help='Export the roster to Google Sheets.')
     parser.add_argument('--share-email', type=str, help='Email address to share the Google Sheet with.')
     parser.add_argument('--force-regenerate', action='store_true', help='Force regeneration of the roster, ignoring any cached version.')
+    parser.add_argument('--fixed-roster', type=str, help='Path to a JSON file with a fixed partial roster.')
+    parser.add_argument('--sheet-name', type=str, default='Sheet1', help='Name of the worksheet to export to (e.g., Proposed).')
     args = parser.parse_args()
 
     cache_filename = f"roster_{args.year}_{args.month}.json"
@@ -417,7 +445,7 @@ if __name__ == '__main__':
 
     if roster is None:
         print("Generating new roster...")
-        roster = generate_roster_cp(args.year, args.month)
+        roster = generate_roster_cp(args.year, args.month, args.fixed_roster)
         
         if roster:
             print(f"Saving roster to cache file: {cache_filename}")
@@ -435,6 +463,7 @@ if __name__ == '__main__':
             print("Please ensure 'your_service_account_file.json' is in the same directory.")
             export_to_gsheet(roster, stats_data, args.year, args.month, 
                              service_account_file='your_service_account_file.json', 
-                             share_email=args.share_email)
+                             share_email=args.share_email, 
+                             worksheet_name=args.sheet_name)
     else:
         print("Could not generate or load a roster.")
