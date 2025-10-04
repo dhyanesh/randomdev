@@ -21,6 +21,10 @@ class October2025Constraints(MonthlyConstraints):
         
         # --- Hard Constraints ("need") ---
 
+        # SK needs leave on 20
+        for s in all_shifts:
+            model.Add(shifts[(sk_idx, 20, s)] == 0)
+
         # PK needs leave on 20, 25, 26
         for d in [20, 25, 26]:
             for s in all_shifts:
@@ -44,7 +48,6 @@ class October2025Constraints(MonthlyConstraints):
 
         # MT needs to be off Oct 1, 2, 3. Taking 2 CLs.
         cl_days_per_consultant['MT'] = 2
-        cl_days_per_consultant['MH'] = 2
         cl_days_per_consultant['AM'] = 2
         for d in [1, 2, 3]:
             for s in all_shifts:
@@ -55,6 +58,9 @@ class October2025Constraints(MonthlyConstraints):
 
         # MT No morning shift on Oct 7th
         model.Add(shifts[(mt_idx, 7, 0)] == 0)
+
+        # MT No night shift on Oct 26th
+        model.Add(shifts[(mt_idx, 26, 2)] == 0)
 
         # MJ needs leave on 20, 21, 22, 23
         for d in [20, 21, 22, 23]:

@@ -294,7 +294,6 @@ def get_statistics(roster, year, month):
     if year == 2025 and month == 10:
         cl_days_per_consultant['PK'] = 4
         cl_days_per_consultant['MT'] = 2
-        cl_days_per_consultant['MH'] = 2
         cl_days_per_consultant['AM'] = 2
 
     stats_header = [ 'Consultant', 'General', 'Afternoon', 'Night', 'Total Hours']
@@ -325,7 +324,7 @@ def get_statistics(roster, year, month):
     # Add HOD stats
     num_days = calendar.monthrange(year, month)[1]
     hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6)
-    hod_hours = hod_mornings * 9
+    hod_hours = hod_mornings * 5
     stats_rows.append(['Dr. BHARGAVA', hod_mornings, 0, 0, hod_hours])
     
     return stats_rows
