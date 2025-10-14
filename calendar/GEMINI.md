@@ -70,6 +70,26 @@ python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-ca
 *   `--create-sheet`: Creates a new Google Sheet.
 *   `--import-calendar`: Imports the schedule into Google Calendar.
 
+**3. Roster Importer:**
+
+The `import_roster_to_calendar.py` script imports a roster from a Google Sheet and creates events in Google Calendar.
+
+**Prerequisites:**
+
+*   Python 3
+*   Required libraries: `gspread`, `google-auth-oauthlib`, `google-api-python-client`
+*   A `your_service_account_file.json` file with Google Cloud service account credentials.
+
+**Running the script:**
+
+```bash
+python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_name>
+```
+
+*   `<year>`: The year for the roster (e.g., 2025).
+*   `<month>`: The month for the roster (e.g., 10).
+*   `<sheet_name>`: The name of the worksheet to import from.
+
 ### Development Conventions
 
 *   **Testing:** The project uses the `unittest` framework for testing. Test files are `test_roster_generator.py` and `test_trilife_shifts.py`.
@@ -81,7 +101,11 @@ python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-ca
 
 *   `roster_generator_cp.py`: The main script for generating the duty roster using OR-Tools. It supports caching and exporting to Google Sheets.
 *   `trilife_shifts.py`: A script to parse a PDF roster and create a schedule in Google Sheets and Calendar.
+*   `import_roster_to_calendar.py`: A script to import a roster from a Google Sheet and create events in Google Calendar.
 *   `shifts.py`: A simpler, interactive script for creating shift schedules.
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
 *   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025. This is used with the `--fixed-roster` argument in `roster_generator_cp.py` to ensure that the specified shifts are not changed during roster generation.
+*   `additional_constraints.txt`: A text file containing additional constraints for the roster generation.
+*   `consultant_requests_2025_10.txt`: A text file containing the leave requests and shift preferences for each consultant for October 2025.
+*   `roster_2025_10.json`: The generated roster for October 2025.
