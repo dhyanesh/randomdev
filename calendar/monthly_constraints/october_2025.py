@@ -5,7 +5,22 @@ class October2025Constraints(MonthlyConstraints):
     """
     Applies the specific requests for October 2025.
     """
-    def apply_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+
+    def get_cl_days(self):
+        return {'PK': 4, 'MT': 2, 'AM': 2}
+
+    def get_special_night_consultants(self):
+        return ['MT', 'AM']
+
+    def apply_hard_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+        # Apply general hard constraints
+        super().apply_one_shift_per_day_constraint(model, shifts, consultants, all_days, all_shifts)
+        super().apply_shift_size_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
+        super().apply_night_shift_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
+        super().apply_post_night_duty_constraints(model, shifts, consultants, all_days, all_shifts)
+        super().apply_leave_constraints(model, shifts, consultants, all_days, all_shifts)
+
+        # Apply October-specific hard constraints
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
         ps_idx = consultant_map['PS']
         mh_idx = consultant_map['MH']
@@ -17,10 +32,6 @@ class October2025Constraints(MonthlyConstraints):
         mj_idx = consultant_map['MJ']
         sj_idx = consultant_map['SJ']
 
-        cl_days_per_consultant = {c.initial: 0 for c in consultants}
-        
-        # --- Hard Constraints ("need") ---
-
         # SK needs leave on 20
         for s in all_shifts:
             model.Add(shifts[(sk_idx, 20, s)] == 0)
@@ -31,7 +42,6 @@ class October2025Constraints(MonthlyConstraints):
                 model.Add(shifts[(pk_idx, d, s)] == 0)
 
         # PK needs 4 days CL from Oct 2-5
-        cl_days_per_consultant['PK'] = 4
         for d in [2, 3, 4, 5]:
             for s in all_shifts:
                 model.Add(shifts[(pk_idx, d, s)] == 0)
@@ -46,9 +56,7 @@ class October2025Constraints(MonthlyConstraints):
             for s in all_shifts:
                 model.Add(shifts[(am_idx, d, s)] == 0)
 
-        # MT needs to be off Oct 1, 2, 3. Taking 2 CLs.
-        cl_days_per_consultant['MT'] = 2
-        cl_days_per_consultant['AM'] = 2
+        # MT needs to be off Oct 1, 2, 3
         for d in [1, 2, 3]:
             for s in all_shifts:
                 model.Add(shifts[(mt_idx, d, s)] == 0)
@@ -87,17 +95,10 @@ class October2025Constraints(MonthlyConstraints):
             for s in all_shifts:
                 model.Add(shifts[(mh_idx, d, s)] == 0)
 
-
         # Mittal: After the 27th, only two consecutive night duties are allowed.
-        # No other duties are permitted for Mittal after the 27th.
         days_after_27 = range(27, 32)
-
-        # Sum of all shifts for Mittal after 27th is 2
         model.Add(sum(shifts[(mt_idx, d, s)] for d in days_after_27 for s in all_shifts) == 2)
-        # Sum of night shifts for Mittal after 27th is 2
         model.Add(sum(shifts[(mt_idx, d, 2)] for d in days_after_27) == 2)
-
-        # The 2 night shifts must be consecutive
         consecutive_nights_vars = []
         for d in range(27, 31):
             v = model.NewBoolVar(f'mt_consecutive_nights_{d}')
@@ -114,8 +115,18 @@ class October2025Constraints(MonthlyConstraints):
         model.Add(shifts[(mh_idx, 18, 0)] == 0)
         model.Add(shifts[(mh_idx, 6, 0)] == 1)
 
+    def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+        consultant_map = {c.initial: i for i, c in enumerate(consultants)}
+        ps_idx = consultant_map['PS']
+        mh_idx = consultant_map['MH']
+        pk_idx = consultant_map['PK']
+        sk_idx = consultant_map['SK']
+        sb_idx = consultant_map['SB']
+        am_idx = consultant_map['AM']
+        mt_idx = consultant_map['MT']
+        mj_idx = consultant_map['MJ']
+        sj_idx = consultant_map['SJ']
 
-        # --- Soft Constraints ("prefer") ---
         positive_preferences = []
         negative_preferences = []
 
@@ -133,11 +144,8 @@ class October2025Constraints(MonthlyConstraints):
         sundays = [d for d in all_days if datetime.date(year, month, d).weekday() == 6]
         weekdays = [d for d in all_days if datetime.date(year, month, d).weekday() < 5]
         weekends = saturdays + sundays
-        # Prefer morning shifts on weekends
         positive_preferences.extend([shifts[(sk_idx, d, 0)] for d in weekends])
-        # Prefer afternoon shifts on weekdays
         positive_preferences.extend([shifts[(sk_idx, d, 1)] for d in weekdays])
-        # Avoid night shifts on weekends
         negative_preferences.extend([shifts[(sk_idx, d, 2)] for d in weekends])
 
         # SB
@@ -154,10 +162,9 @@ class October2025Constraints(MonthlyConstraints):
         negative_preferences.extend([shifts[(mj_idx, 5, s)] for s in all_shifts])
 
         # SJ
-        # Preference for 4 consecutive morning shifts removed for performance.
         positive_preferences.append(shifts[(sj_idx, 20, 0)])
 
         preference_score = model.NewIntVar(-500, 500, 'preference_score')
         model.Add(preference_score == sum(positive_preferences) - sum(negative_preferences))
 
-        return cl_days_per_consultant, preference_score
+        return preference_score

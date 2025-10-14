@@ -54,6 +54,7 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 from pathlib import Path
+from monthly_constraints.base import MonthlyConstraints
 from monthly_constraints.october_2025 import October2025Constraints
 
 # Based on the provided PDF and constraints.
@@ -71,6 +72,11 @@ CONSULTANTS = [
     Consultant('DR. SIMMY JOHN', 'SJ', False, 'Female'),
     Consultant('DR. MANJUNATH N S', 'MNS', True, 'Male'),
 ]
+
+def get_constraints_handler(year, month):
+    if year == 2025 and month == 10:
+        return October2025Constraints()
+    return MonthlyConstraints()
 
 def generate_roster_cp(year, month, fixed_roster_file=None):
     """
@@ -102,96 +108,11 @@ def generate_roster_cp(year, month, fixed_roster_file=None):
                     c_idx = [i for i, c in enumerate(CONSULTANTS) if c.initial == consultant_initial][0]
                     model.Add(shifts[(c_idx, d, s)] == 1)
 
-    # --- Define Hard Constraints ---
-
-    # Each consultant works at most one shift per day
-    for c in all_consultants:
-        for d in all_days:
-            model.Add(sum(shifts[(c, d, s)] for s in all_shifts) <= 1)
-
-    cl_days_per_consultant = {c.initial: 0 for c in CONSULTANTS}
-    preference_score = model.NewIntVar(0, 0, 'preference_score') # Default empty score
-
-    if year == 2025 and month == 10:
-        constraints_handler = October2025Constraints()
-        cl_days_per_consultant, preference_score = constraints_handler.apply_constraints(
-            model, shifts, CONSULTANTS, all_days, all_shifts, year, month
-        )
-
-    # Shift size constraints
-    for d in all_days:
-        model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) >= 2) # Morning shift is 2 or 3 people
-        model.Add(sum(shifts[(c, d, 0)] for c in all_consultants) <= 3)
-        date = datetime.date(year, month, d)
-        if date.weekday() < 6:
-            model.Add(sum(shifts[(c, d, 1)] for c in all_consultants) == 1) # Afternoon
-        else:
-            model.Add(sum(shifts[(c, d, 1)] for c in all_consultants) == 0)
-        model.Add(sum(shifts[(c, d, 2)] for c in all_consultants) == 2) # Night
-
-    # No afternoon shifts for AM and SJ
-    am_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'AM'][0]
-    sj_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'SJ'][0]
-    for d in all_days:
-        model.Add(shifts[(am_index, d, 1)] == 0)
-        if not (year == 2025 and month == 10):
-            model.Add(shifts[(sj_index, d, 1)] == 0)
-
-    # At least one senior on night shift
-    senior_indices = [i for i, c in enumerate(CONSULTANTS) if c.is_senior]
-    for d in all_days:
-        model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
-
-    # No two female consultants on night shift
-    female_indices = [i for i, c in enumerate(CONSULTANTS) if c.gender == 'Female']
-    for d in all_days:
-        model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
-
-    # AM and MH cannot work together in night
-    mh_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MH'][0]
-    for d in all_days:
-        model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
-
-    # Mittal cannot do Monday and Wednesday night duties
-    mittal_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MT'][0]
-    for d in all_days:
-        date = datetime.date(year, month, d)
-        # For Oct 2025, ignore this constraint on or after 27th
-        if year == 2025 and month == 10 and d >= 27:
-            continue
-        if date.weekday() == 0 or date.weekday() == 2: # Monday or Wednesday
-            model.Add(shifts[(mittal_index, d, 2)] == 0)
-
-    # Mittal cannot do Sunday morning duties
-    for d in all_days:
-        date = datetime.date(year, month, d)
-        if date.weekday() == 6: # Sunday
-            model.Add(shifts[(mittal_index, d, 0)] == 0)
-
-    # Post-night duty
-    for c in all_consultants:
-        for d in all_days[:-1]:
-            model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 0)] <= 1)
-            model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 1)] <= 1)
-
-    # Night shift constraints
-    mh_index = [i for i, c in enumerate(CONSULTANTS) if c.initial == 'MH'][0]
-    model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
-
-    oct_2025_special_nights = []
-    if year == 2025 and month == 10:
-        oct_2025_special_nights = ['MT', 'AM']
-
-    for c_idx, c in enumerate(CONSULTANTS):
-        if c.initial != 'MH' and c.initial not in oct_2025_special_nights:
-            num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
-            model.Add(num_nights >= 5)
-            model.Add(num_nights <= 7)
-
-    # No more than 4 consecutive leaves
-    for c in all_consultants:
-        for d in range(1, num_days - 3):
-            model.Add(sum(shifts[(c, i, s)] for i in range(d, d + 5) for s in all_shifts) >= 1)
+    # --- Apply constraints ---
+    constraints_handler = get_constraints_handler(year, month)
+    cl_days_per_consultant, preference_score = constraints_handler.apply_all_constraints(
+        model, shifts, CONSULTANTS, all_days, all_shifts, year, month
+    )
 
     # --- Define Soft Constraints (Objectives) ---
 
@@ -260,9 +181,9 @@ def generate_roster_cp(year, month, fixed_roster_file=None):
                     roster[d]['afternoon'].append(c.initial)
                 if solver.Value(shifts[(c_idx, d, 2)]) == 1:
                     roster[d]['night'].append(c.initial)
-        return roster
+        return roster, cl_days_per_consultant
     else:
-        return None
+        return None, None
 
 def print_roster(roster, year, month):
     if roster is None:
@@ -285,16 +206,10 @@ def print_roster(roster, year, month):
         night_str = '/'.join(shifts['night'])
         print(f"{day_name:<10} | {date_str:<10} | {morning_str:<19} | {afternoon_str:<20} | {night_str}")
 
-def get_statistics(roster, year, month):
+def get_statistics(roster, year, month, cl_days_per_consultant):
     """Calculates shift statistics and returns them as a list of lists."""
     if roster is None:
         return None
-
-    cl_days_per_consultant = {}
-    if year == 2025 and month == 10:
-        cl_days_per_consultant['PK'] = 4
-        cl_days_per_consultant['MT'] = 2
-        cl_days_per_consultant['AM'] = 2
 
     stats_header = [ 'Consultant', 'General', 'Afternoon', 'Night', 'Total Hours']
     stats_rows = [stats_header]
@@ -432,6 +347,7 @@ if __name__ == '__main__':
 
     cache_filename = f"roster_{args.year}_{args.month}.json"
     roster = None
+    cl_days_per_consultant = {}
 
     if not args.force_regenerate:
         try:
@@ -439,12 +355,15 @@ if __name__ == '__main__':
                 print(f"Loading roster from cache file: {cache_filename}")
                 cached_roster = json.load(f)
                 roster = {int(k): v for k, v in cached_roster.items()}
+                # We need to get the cl_days from the handler
+                constraints_handler = get_constraints_handler(args.year, args.month)
+                cl_days_per_consultant = constraints_handler.get_cl_days()
         except FileNotFoundError:
             print("No cache file found.")
 
     if roster is None:
         print("Generating new roster...")
-        roster = generate_roster_cp(args.year, args.month, args.fixed_roster)
+        roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, args.fixed_roster)
         
         if roster:
             print(f"Saving roster to cache file: {cache_filename}")
@@ -454,7 +373,7 @@ if __name__ == '__main__':
     if roster:
         print_roster(roster, args.year, args.month)
         print() # Add a blank line
-        stats_data = get_statistics(roster, args.year, args.month)
+        stats_data = get_statistics(roster, args.year, args.month, cl_days_per_consultant)
         print_statistics_from_data(stats_data)
 
         if args.export_gsheet:
