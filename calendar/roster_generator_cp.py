@@ -56,6 +56,32 @@ from google.oauth2.service_account import Credentials
 from pathlib import Path
 from monthly_constraints.base import MonthlyConstraints
 from monthly_constraints.october_2025 import October2025Constraints
+from google.cloud import storage
+
+
+def download_json_from_gcs(bucket_name, blob_name):
+    """Downloads a JSON file from GCS and returns it as a dictionary."""
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        data = blob.download_as_text()
+        return json.loads(data)
+    except Exception as e:
+        print(f"Error downloading JSON from GCS (gs://{bucket_name}/{blob_name}): {e}")
+        return None
+
+def upload_json_to_gcs(bucket_name, blob_name, data):
+    """Uploads a dictionary as a JSON file to GCS."""
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(json.dumps(data, indent=4), content_type='application/json')
+        print(f"Successfully uploaded to gs://{bucket_name}/{blob_name}")
+    except Exception as e:
+        print(f"Error uploading JSON to GCS: {e}")
+
 
 # Based on the provided PDF and constraints.
 Consultant = namedtuple('Consultant', ['name', 'initial', 'is_senior', 'gender'])
@@ -78,7 +104,7 @@ def get_constraints_handler(year, month):
         return October2025Constraints()
     return MonthlyConstraints()
 
-def generate_roster_cp(year, month, fixed_roster_file=None):
+def generate_roster_cp(year, month, fixed_roster=None):
     """
     Generates a duty roster for the given year and month using the CP-SAT solver.
     """
@@ -97,9 +123,7 @@ def generate_roster_cp(year, month, fixed_roster_file=None):
                 shifts[(c, d, s)] = model.NewBoolVar(f'shift_c{c}_d{d}_s{s}')
 
     # --- Apply fixed roster constraints ---
-    if fixed_roster_file:
-        with open(fixed_roster_file, 'r') as f:
-            fixed_roster = json.load(f)
+    if fixed_roster:
         for day, day_shifts in fixed_roster.items():
             d = int(day)
             for shift_name, consultants in day_shifts.items():
@@ -334,41 +358,46 @@ def export_to_gsheet(roster, stats_data, year, month, service_account_file='your
     print(f"Sheet URL: {spreadsheet.url}")
     print("-" * 30)
 
-if __name__ == '__main__':
+def main(argv=None):
     parser = argparse.ArgumentParser(description='Generate a duty roster for consultants.')
     parser.add_argument('-y', '--year', type=int, default=datetime.datetime.now().year, help='The year for the roster.')
     parser.add_argument('-m', '--month', type=int, default=datetime.datetime.now().month, help='The month for the roster.')
     parser.add_argument('--export-gsheet', action='store_true', help='Export the roster to Google Sheets.')
     parser.add_argument('--share-email', type=str, help='Email address to share the Google Sheet with.')
     parser.add_argument('--force-regenerate', action='store_true', help='Force regeneration of the roster, ignoring any cached version.')
-    parser.add_argument('--fixed-roster', type=str, help='Path to a JSON file with a fixed partial roster.')
+    parser.add_argument('--fixed-roster', type=str, help='GCS blob name for a JSON file with a fixed partial roster.')
     parser.add_argument('--sheet-name', type=str, default='Sheet1', help='Name of the worksheet to export to (e.g., Proposed).')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    cache_filename = f"roster_{args.year}_{args.month}.json"
+    bucket_name = "trilife-duty-roster-files"
+    cache_blob_name = f"{args.year}/{args.month}/roster.json"
     roster = None
     cl_days_per_consultant = {}
 
     if not args.force_regenerate:
-        try:
-            with open(cache_filename, 'r') as f:
-                print(f"Loading roster from cache file: {cache_filename}")
-                cached_roster = json.load(f)
-                roster = {int(k): v for k, v in cached_roster.items()}
-                # We need to get the cl_days from the handler
-                constraints_handler = get_constraints_handler(args.year, args.month)
-                cl_days_per_consultant = constraints_handler.get_cl_days()
-        except FileNotFoundError:
-            print("No cache file found.")
+        print(f"Loading roster from GCS: gs://{bucket_name}/{cache_blob_name}")
+        cached_roster = download_json_from_gcs(bucket_name, cache_blob_name)
+        if cached_roster:
+            roster = {int(k): v for k, v in cached_roster.items()}
+            # We need to get the cl_days from the handler
+            constraints_handler = get_constraints_handler(args.year, args.month)
+            cl_days_per_consultant = constraints_handler.get_cl_days()
+        else:
+            print("No cache file found in GCS.")
 
     if roster is None:
         print("Generating new roster...")
-        roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, args.fixed_roster)
+        fixed_roster_data = None
+        if args.fixed_roster:
+            fixed_roster_blob_name = f"{args.year}/{args.month}/fixed_roster.json"
+            print(f"Loading fixed roster from GCS: gs://{bucket_name}/{fixed_roster_blob_name}")
+            fixed_roster_data = download_json_from_gcs(bucket_name, fixed_roster_blob_name)
+
+        roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, fixed_roster_data)
         
         if roster:
-            print(f"Saving roster to cache file: {cache_filename}")
-            with open(cache_filename, 'w') as f:
-                json.dump(roster, f, indent=4)
+            print(f"Saving roster to GCS: gs://{bucket_name}/{cache_blob_name}")
+            upload_json_to_gcs(bucket_name, cache_blob_name, roster)
 
     if roster:
         print_roster(roster, args.year, args.month)
@@ -385,3 +414,6 @@ if __name__ == '__main__':
                              worksheet_name=args.sheet_name)
     else:
         print("Could not generate or load a roster.")
+
+if __name__ == '__main__':
+    main()
