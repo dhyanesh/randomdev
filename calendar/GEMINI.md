@@ -106,6 +106,6 @@ python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_nam
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
 *   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025. This is used with the `--fixed-roster` argument in `roster_generator_cp.py` to ensure that the specified shifts are not changed during roster generation.
-*   `additional_constraints.txt`: A text file containing additional constraints for the roster generation.
+*   `trilife_constraints.txt`: A text file containing all the constraints for the roster generation.
 *   `consultant_requests_2025_10.txt`: A text file containing the leave requests and shift preferences for each consultant for October 2025.
 *   `roster_2025_10.json`: The generated roster for October 2025.

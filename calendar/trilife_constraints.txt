@@ -11,3 +11,4 @@
 11. There should be 2 consultants for the night shift.
 12. AM and SJ cannot do Afternoon shifts.
 13. No two female consultants can be on the night shift together.
+14. Mittal cannot do Monday and Wednesday night duties.
