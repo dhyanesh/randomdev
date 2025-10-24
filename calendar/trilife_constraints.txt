@@ -12,3 +12,4 @@
 12. AM and SJ cannot do Afternoon shifts.
 13. No two female consultants can be on the night shift together.
 14. Mittal cannot do Monday and Wednesday night duties.
+15. Simmy needs at least one week where there are 4 consecutive general duties.

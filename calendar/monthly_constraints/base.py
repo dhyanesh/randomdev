@@ -5,8 +5,8 @@ class MonthlyConstraints:
     Base class for applying constraints to the roster model.
     """
 
-    def apply_all_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
-        self.apply_hard_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
+    def apply_all_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster=None):
+        self.apply_hard_constraints(model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster)
         cl_days = self.get_cl_days()
         preference_score = self.apply_soft_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
         return cl_days, preference_score
@@ -17,13 +17,14 @@ class MonthlyConstraints:
     def get_special_night_consultants(self):
         return []
 
-    def apply_hard_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+    def apply_hard_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster=None):
         self.apply_one_shift_per_day_constraint(model, shifts, consultants, all_days, all_shifts)
         self.apply_shift_size_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
         self.apply_consultant_specific_shift_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
         self.apply_night_shift_constraints(model, shifts, consultants, all_days, all_shifts, year, month)
-        self.apply_post_night_duty_constraints(model, shifts, consultants, all_days, all_shifts)
+        self.apply_post_night_duty_constraints(model, shifts, consultants, all_days, all_shifts, previous_month_roster)
         self.apply_leave_constraints(model, shifts, consultants, all_days, all_shifts)
+        self.apply_simmy_consecutive_shifts_constraint(model, shifts, consultants, all_days)
 
     def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         return model.NewIntVar(0, 0, 'preference_score')
@@ -79,13 +80,30 @@ class MonthlyConstraints:
                 model.Add(num_nights >= 5)
                 model.Add(num_nights <= 7)
 
-    def apply_post_night_duty_constraints(self, model, shifts, consultants, all_days, all_shifts):
+    def apply_post_night_duty_constraints(self, model, shifts, consultants, all_days, all_shifts, previous_month_roster=None):
         for c in range(len(consultants)):
             for d in all_days[:-1]:
                 model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 0)] <= 1)
                 model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 1)] <= 1)
 
+        if previous_month_roster:
+            last_day_of_previous_month = max(previous_month_roster.keys())
+            for c_idx, c in enumerate(consultants):
+                if c.initial in previous_month_roster[last_day_of_previous_month]['night']:
+                    model.Add(shifts[(c_idx, 1, 0)] == 0)
+                    model.Add(shifts[(c_idx, 1, 1)] == 0)
+
     def apply_leave_constraints(self, model, shifts, consultants, all_days, all_shifts):
         for c in range(len(consultants)):
             for d in range(1, len(all_days) - 3):
                 model.Add(sum(shifts[(c, i, s)] for i in range(d, d + 5) for s in all_shifts) >= 1)
+
+    def apply_simmy_consecutive_shifts_constraint(self, model, shifts, consultants, all_days):
+        sj_index = next(i for i, c in enumerate(consultants) if c.initial == 'SJ')
+        consecutive_shifts_vars = []
+        for d in range(1, len(all_days) - 2):
+            v = model.NewBoolVar(f'sj_consecutive_shifts_{d}')
+            model.Add(sum(shifts[(sj_index, i, 0)] for i in range(d, d + 4)) == 4).OnlyEnforceIf(v)
+            model.Add(sum(shifts[(sj_index, i, 0)] for i in range(d, d + 4)) != 4).OnlyEnforceIf(v.Not())
+            consecutive_shifts_vars.append(v)
+        model.Add(sum(consecutive_shifts_vars) >= 1)

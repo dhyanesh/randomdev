@@ -56,6 +56,7 @@ from google.oauth2.service_account import Credentials
 from pathlib import Path
 from monthly_constraints.base import MonthlyConstraints
 from monthly_constraints.october_2025 import October2025Constraints
+from monthly_constraints.november_2025 import November2025Constraints
 from google.cloud import storage
 
 
@@ -102,9 +103,11 @@ CONSULTANTS = [
 def get_constraints_handler(year, month):
     if year == 2025 and month == 10:
         return October2025Constraints()
+    if year == 2025 and month == 11:
+        return November2025Constraints()
     return MonthlyConstraints()
 
-def generate_roster_cp(year, month, fixed_roster=None):
+def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=None):
     """
     Generates a duty roster for the given year and month using the CP-SAT solver.
     """
@@ -135,7 +138,7 @@ def generate_roster_cp(year, month, fixed_roster=None):
     # --- Apply constraints ---
     constraints_handler = get_constraints_handler(year, month)
     cl_days_per_consultant, preference_score = constraints_handler.apply_all_constraints(
-        model, shifts, CONSULTANTS, all_days, all_shifts, year, month
+        model, shifts, CONSULTANTS, all_days, all_shifts, year, month, previous_month_roster
     )
 
     # --- Define Soft Constraints (Objectives) ---
@@ -393,7 +396,13 @@ def main(argv=None):
             print(f"Loading fixed roster from GCS: gs://{bucket_name}/{fixed_roster_blob_name}")
             fixed_roster_data = download_json_from_gcs(bucket_name, fixed_roster_blob_name)
 
-        roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, fixed_roster_data)
+        previous_month = args.month - 1 if args.month > 1 else 12
+        previous_year = args.year if args.month > 1 else args.year - 1
+        previous_month_roster_blob_name = f"{previous_year}/{previous_month}/roster.json"
+        print(f"Loading previous month's roster from GCS: gs://{bucket_name}/{previous_month_roster_blob_name}")
+        previous_month_roster = download_json_from_gcs(bucket_name, previous_month_roster_blob_name)
+
+        roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, fixed_roster_data, previous_month_roster)
         
         if roster:
             print(f"Saving roster to GCS: gs://{bucket_name}/{cache_blob_name}")
