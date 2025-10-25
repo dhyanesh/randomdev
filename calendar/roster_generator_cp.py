@@ -63,7 +63,7 @@ from google.cloud import storage
 def download_json_from_gcs(bucket_name, blob_name):
     """Downloads a JSON file from GCS and returns it as a dictionary."""
     try:
-        storage_client = storage.Client()
+        storage_client = storage.Client(project="roster-generator-475707")
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
         data = blob.download_as_text()
@@ -75,7 +75,7 @@ def download_json_from_gcs(bucket_name, blob_name):
 def upload_json_to_gcs(bucket_name, blob_name, data):
     """Uploads a dictionary as a JSON file to GCS."""
     try:
-        storage_client = storage.Client()
+        storage_client = storage.Client(project="roster-generator-475707")
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
         blob.upload_from_string(json.dumps(data, indent=4), content_type='application/json')
@@ -224,7 +224,7 @@ def print_roster(roster, year, month):
         day_name = date.strftime('%a')
         
         morning_shifts = shifts['morning'][:] # Make a copy
-        if date.weekday() < 6: # Not Sunday
+        if date.weekday() < 6 and (day < 5 or day > 15): # Not Sunday
             morning_shifts.insert(0, 'BG')
 
         date_str = f"{day}-{month}-{year}"
@@ -265,7 +265,7 @@ def get_statistics(roster, year, month, cl_days_per_consultant):
     
     # Add HOD stats
     num_days = calendar.monthrange(year, month)[1]
-    hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6)
+    hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6 and (i < 5 or i > 15))
     hod_hours = hod_mornings * 5
     stats_rows.append(['Dr. BHARGAVA', hod_mornings, 0, 0, hod_hours])
     
@@ -337,7 +337,7 @@ def export_to_gsheet(roster, stats_data, year, month, service_account_file='your
         date_str = f"{day}-{month}-{year}"
         
         morning_shifts = shifts['morning'][:] # Make a copy
-        if date.weekday() < 6: # Not Sunday
+        if date.weekday() < 6 and (day < 5 or day > 15): # Not Sunday
             morning_shifts.insert(0, 'BG')
 
         morning_str = '/'.join(morning_shifts)

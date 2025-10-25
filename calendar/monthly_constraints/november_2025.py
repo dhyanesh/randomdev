@@ -7,7 +7,7 @@ class November2025Constraints(MonthlyConstraints):
     """
 
     def get_cl_days(self):
-        return {'AM': 1, 'SJ': 2, 'MJ': 4}
+        return {'AM': 1, 'SJ': 2, 'MJ': 5}
 
     def get_special_night_consultants(self):
         return []
@@ -82,6 +82,30 @@ class November2025Constraints(MonthlyConstraints):
         # MH night preferences
         for d in [1, 2, 8, 9]:
             model.Add(shifts[(mh_idx, d, 2)] == 1)
+
+        # Mohan vacation on 21 and 26
+        for d in [21, 26]:
+            for s in all_shifts:
+                model.Add(shifts[(mh_idx, d, s)] == 0)
+
+        # Amirtha holiday on 16th night
+        model.Add(shifts[(am_idx, 16, 2)] == 0)
+
+        # PK holiday on 10th
+        for s in all_shifts:
+            model.Add(shifts[(pk_idx, 10, s)] == 0)
+
+        # PK can only do morning shift on 1st
+        model.Add(shifts[(pk_idx, 1, 1)] == 0)
+        model.Add(shifts[(pk_idx, 1, 2)] == 0)
+
+        # Mittal holidays on 29th and 30th
+        for d in [29, 30]:
+            for s in all_shifts:
+                model.Add(shifts[(mt_idx, d, s)] == 0)
+
+        # Mittal 6 nights
+        model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) == 6)
 
     def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
