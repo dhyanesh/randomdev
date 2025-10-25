@@ -83,8 +83,8 @@ class November2025Constraints(MonthlyConstraints):
         for d in [1, 2, 8, 9]:
             model.Add(shifts[(mh_idx, d, 2)] == 1)
 
-        # Mohan vacation on 21 and 26
-        for d in [21, 26]:
+        # Mohan vacation on 21, 25 and 26
+        for d in [21, 25, 26]:
             for s in all_shifts:
                 model.Add(shifts[(mh_idx, d, s)] == 0)
 
