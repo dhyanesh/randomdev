@@ -57,6 +57,7 @@ from pathlib import Path
 from monthly_constraints.base import MonthlyConstraints
 from monthly_constraints.october_2025 import October2025Constraints
 from monthly_constraints.november_2025 import November2025Constraints
+from monthly_constraints.december_2025 import December2025Constraints
 from google.cloud import storage
 
 
@@ -105,6 +106,8 @@ def get_constraints_handler(year, month):
         return October2025Constraints()
     if year == 2025 and month == 11:
         return November2025Constraints()
+    if year == 2025 and month == 12:
+        return December2025Constraints()
     return MonthlyConstraints()
 
 def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=None):
@@ -160,8 +163,8 @@ def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=Non
         target_hours = 192 - (cl_days * 8)
 
         total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-        model.Add(total_hours_expr <= target_hours) # Hard constraint
-        model.Add(total_hours_expr >= target_hours - 16) # Hard constraint with wider window
+        model.Add(total_hours_expr <= target_hours + 40) # Relaxed Hard constraint (Overtime allowed)
+        model.Add(total_hours_expr >= target_hours - 50) # Relaxed Hard constraint (Undertime allowed)
         
         # Soft constraint to be close to target
         deviation = model.NewIntVar(0, 100, f'deviation_c{c_idx}')
@@ -210,6 +213,8 @@ def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=Non
                     roster[d]['night'].append(c.initial)
         return roster, cl_days_per_consultant
     else:
+        print(f"Solver Status: {solver.StatusName(status)}")
+        print(solver.ResponseStats())
         return None, None
 
 def print_roster(roster, year, month):
@@ -224,7 +229,7 @@ def print_roster(roster, year, month):
         day_name = date.strftime('%a')
         
         morning_shifts = shifts['morning'][:] # Make a copy
-        if date.weekday() < 6 and (day < 5 or day > 15): # Not Sunday
+        if date.weekday() < 6: # Not Sunday
             morning_shifts.insert(0, 'BG')
 
         date_str = f"{day}-{month}-{year}"
@@ -337,7 +342,7 @@ def export_to_gsheet(roster, stats_data, year, month, service_account_file='your
         date_str = f"{day}-{month}-{year}"
         
         morning_shifts = shifts['morning'][:] # Make a copy
-        if date.weekday() < 6 and (day < 5 or day > 15): # Not Sunday
+        if date.weekday() < 6: # Not Sunday
             morning_shifts.insert(0, 'BG')
 
         morning_str = '/'.join(morning_shifts)
