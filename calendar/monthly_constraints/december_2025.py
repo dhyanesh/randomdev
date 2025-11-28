@@ -7,58 +7,82 @@ class December2025Constraints(MonthlyConstraints):
     """
 
     def get_cl_days(self):
+        # Specific CL requests
         return {
-            'MT': 24,
-            'MNS': 10
+            'PK': 4, # Changed from 5 to 4
+            'MJ': 5,
+            'PS': 3,
+            'SK': 4, 
+            'SJ': 5,
+            'AM': 2,
+            # MT is off, giving him CLs to reduce target to 0 so lower bound check passes
+            'MT': 24, 
+            # MNS: 0 (User instruction)
+            # SB: 0 (Only asked for leaves, not CL)
         }
 
     def get_special_night_consultants(self):
-        return ['MT', 'MNS']
+        return ['MT']
 
     def apply_leave_constraints(self, model, shifts, consultants, all_days, all_shifts):
+        # Override to allow long leaves
         pass
-    
-    # Re-enabling this as it wasn't the cause of strict infeasibility (math was)
-    # def apply_simmy_consecutive_shifts_constraint(self, model, shifts, consultants, all_days):
-    #    pass
+
+    def apply_simmy_consecutive_shifts_constraint(self, model, shifts, consultants, all_days):
+        # Override to disable Simmy's consecutive shift constraint if it's causing issues
+        pass
+
+    def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+        # Override to enforce exactly 2 consultants in the morning, 0 in afternoon
+        for d in all_days:
+            # Morning: Exactly 2 people
+            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) == 2)
+            
+            # Afternoon: 0 people every day (User request)
+            model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 0)
+            
+            # Night: Exactly 2 people
+            model.Add(sum(shifts[(c, d, 2)] for c in range(len(consultants))) == 2)
 
     def apply_night_shift_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
-        # Override base class to handle capacity issues (MT off, MNS no nights)
         senior_indices = [i for i, c in enumerate(consultants) if c.is_senior]
         female_indices = [i for i, c in enumerate(consultants) if c.gender == 'Female']
         am_index = next(i for i, c in enumerate(consultants) if c.initial == 'AM')
         mh_index = next(i for i, c in enumerate(consultants) if c.initial == 'MH')
-        
-        # Relaxed Night constraints logic...
-        for d in all_days:
-             model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
-             model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
-             model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
 
-        model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
+        for d in all_days:
+            model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
+            model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
+            model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
+
+        # Relaxed MH constraint - Max 4 nights (Hard constraint)
+        # model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) >= 0) # Implicit
+        model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) <= 4)
 
         special_night_consultants = self.get_special_night_consultants()
         for c_idx, c in enumerate(consultants):
             if c.initial != 'MH' and c.initial not in special_night_consultants:
                 num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
-                model.Add(num_nights >= 6) 
-                model.Add(num_nights <= 10) # Relaxed to 10
+                model.Add(num_nights >= 7)
+                model.Add(num_nights <= 8)
 
-    def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
-        for d in all_days:
-            # Morning: At least 2 people (plus BG who is added manually)
-            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) >= 2)
-            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) <= 3) # Keep upper bound
+    def apply_working_hours_constraints(self, model, shifts, consultants, all_days, all_shifts, cl_days):
+        for c_idx, c in enumerate(consultants):
+            consultant_cl_days = cl_days.get(c.initial, 0)
+            target_hours = 192 - (consultant_cl_days * 8)
+            total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
             
-            # Afternoon: 0 consultants
-            model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 0)
+            # Hard cap at 192 hours as requested (Absolute Maximum)
+            model.Add(total_hours_expr <= 192)
             
-            # Night: Strictly 2 people
-            model.Add(sum(shifts[(c, d, 2)] for c in range(len(consultants))) == 2)
+            # Lower bound flexibility
+            # Relaxed to -50 because total available roster hours are less than sum of targets
+            model.Add(total_hours_expr >= target_hours - 50)
 
-    def apply_hard_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster=None):
-        super().apply_hard_constraints(model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster)
-
+    def apply_hard_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster=None, cl_days=None):
+        # Call base constraints
+        super().apply_hard_constraints(model, shifts, consultants, all_days, all_shifts, year, month, previous_month_roster, cl_days)
+        
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
         sb_idx = consultant_map['SB']
         ps_idx = consultant_map['PS']
@@ -77,11 +101,11 @@ class December2025Constraints(MonthlyConstraints):
             for s in all_shifts:
                 model.Add(shifts[(sb_idx, d, s)] == 0)
 
-        # --- PS (Praveen Sr) ---
+        # --- PK (Praveen Jr) ---
         # CL from 4th to 8th
         for d in range(4, 9): # 4, 5, 6, 7, 8
             for s in all_shifts:
-                model.Add(shifts[(ps_idx, d, s)] == 0)
+                model.Add(shifts[(pk_idx, d, s)] == 0)
 
         # --- MJ (Manju Jr) ---
         # CL on 9, 10 and 19, 20, 21
@@ -89,37 +113,41 @@ class December2025Constraints(MonthlyConstraints):
             for s in all_shifts:
                 model.Add(shifts[(mj_idx, d, s)] == 0)
 
-        # --- PK (Praveen Jr) ---
+        # --- PS (Praveen Sr) ---
         # Negative dates (Leave): 8, 9, 16
         for d in [8, 9, 16]:
             for s in all_shifts:
-                model.Add(shifts[(pk_idx, d, s)] == 0)
+                model.Add(shifts[(ps_idx, d, s)] == 0)
         # CL for 3 days: 23 to 25th
         for d in [23, 24, 25]:
             for s in all_shifts:
-                model.Add(shifts[(pk_idx, d, s)] == 0)
+                model.Add(shifts[(ps_idx, d, s)] == 0)
 
         # --- SK (Santosh) ---
-        # Leave request: 1st-3rd & 28-31st
+        # Leave request/CL request 1st-3rd & 28-31st
         for d in [1, 2, 3, 28, 29, 30, 31]:
             for s in all_shifts:
                 model.Add(shifts[(sk_idx, d, s)] == 0)
 
         # --- SJ (Simmy) ---
-        # Leave requests - 6, 21-27 and on 31st
+        # Leave requests - 6, 21-27 and on 31st.
         leaves_sj = [6, 21, 22, 23, 24, 25, 26, 27, 31]
         for d in leaves_sj:
             for s in all_shifts:
                 model.Add(shifts[(sj_idx, d, s)] == 0)
+        # CL - 5
+        for d in [5]:
+            for s in all_shifts:
+                model.Add(shifts[(sj_idx, d, s)] == 0)
 
         # --- AM (Amirtha) ---
-        # Leave needed on 1, 2 , 3 , 7 ,14, 15,16, 17 , 30, 31
+        # Leave needed on 1, 2 , 3 , 7 ,14, 15,16, 17 , 30, 31...
         leaves_am = [1, 2, 3, 7, 14, 15, 16, 17, 30, 31]
         for d in leaves_am:
             for s in all_shifts:
                 model.Add(shifts[(am_idx, d, s)] == 0)
         
-        # Avoid night duty on 6th, 13th (Hard - Negative)
+        # Avoid night duty on 6th, 13th (Hard Request)
         for d in [6, 13]:
             model.Add(shifts[(am_idx, d, 2)] == 0)
 
@@ -128,62 +156,79 @@ class December2025Constraints(MonthlyConstraints):
         for d in all_days:
             model.Add(shifts[(mh_idx, d, 1)] == 0)
 
+        # Specific Hard Preferences (User Request)
+        # N - 6, 7, 28, 29
+        for d in [6, 7, 28, 29]:
+             model.Add(shifts[(mh_idx, d, 2)] == 1)
+             
+        # D - 2, 3, 5, 10, 12, 15, 16, 17, 19, 22, 23, 31 (1st and 8th excluded)
+        for d in [2, 3, 5, 10, 12, 15, 16, 17, 19, 22, 23, 31]:
+             model.Add(shifts[(mh_idx, d, 0)] == 1)
+
         # --- MNS (Manjunath Sr) ---
         # No duties before 11th (1-10)
         for d in range(1, 11):
             for s in all_shifts:
                 model.Add(shifts[(mns_idx, d, s)] == 0)
         
-        # Only morning/afternoon shifts after that (No nights)
-        for d in range(11, 32): # Dec has 31 days
-            model.Add(shifts[(mns_idx, d, 2)] == 0)
+        # Only morning/afternoon shifts after that (Nights allowed now)
+        # for d in range(11, 32):
+        #     model.Add(shifts[(mns_idx, d, 2)] == 0)
         
         # --- MT (Mittal) ---
-        # Off for the entire month
+        # Dr. Mittal is off for the entire month.
         for d in all_days:
             for s in all_shifts:
                 model.Add(shifts[(mt_idx, d, s)] == 0)
 
-    def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+    def calculate_preference_score(self, model, shifts, consultants, all_days, all_shifts, year, month):
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
-        sj_idx = consultant_map['SJ']
-        ps_idx = consultant_map['PS']
-        mh_idx = consultant_map['MH']
         sb_idx = consultant_map['SB']
+        pk_idx = consultant_map['PK']
+        ps_idx = consultant_map['PS']
+        sj_idx = consultant_map['SJ']
         am_idx = consultant_map['AM']
+        mh_idx = consultant_map['MH']
         
         positive_preferences = []
         negative_preferences = []
 
-        # SJ: Preferably morning shift on 5, 20 and 30.
-        for d in [5, 20, 30]:
-             positive_preferences.append(shifts[(sj_idx, d, 0)])
-        
-        # PS: Day duty preferences: 2, 12, 14, 17, 27
-        for d in [2, 12, 14, 17, 27]:
-            positive_preferences.append(shifts[(ps_idx, d, 0)])
-        # PS: Night preferences
-        for d in [9, 10, 18, 20, 24, 29, 30]:
-            positive_preferences.append(shifts[(ps_idx, d, 2)])
-
-        # MH: D (Day) preferences
-        for d in [1, 2, 3, 5, 8, 10, 12, 15, 16, 17, 19, 22, 23, 31]:
-            positive_preferences.append(shifts[(mh_idx, d, 0)])
-        # MH: Night preferences
-        for d in [6, 7, 28, 29]:
-            positive_preferences.append(shifts[(mh_idx, d, 2)])
-            
-        # SB: Night on 8th
-        positive_preferences.append(shifts[(sb_idx, 8, 2)])
-        # SB: Day on 4th, 5th
+        # SB (Shiva)
+        # Day duty on 4th and 5th
         positive_preferences.append(shifts[(sb_idx, 4, 0)])
         positive_preferences.append(shifts[(sb_idx, 5, 0)])
+        # Night duty on 8th
+        positive_preferences.append(shifts[(sb_idx, 8, 2)])
+
+        # PK (Praveen Jr)
+        # Day duty on 2 12 14 17 27
+        for d in [2, 12, 14, 17, 27]:
+            positive_preferences.append(shifts[(pk_idx, d, 0)])
+        # Night on 9 10 18 20 24 29 30
+        for d in [9, 10, 18, 20, 24, 29, 30]:
+            positive_preferences.append(shifts[(pk_idx, d, 2)])
+
+        # PS (Praveen Sr) - No specific positive shift preferences mentioned, just leaves.
         
-        # AM: Night on 21, 23
+        # SJ (Simmy)
+        # Preferably morning shift on 5, 20 and 30.
+        for d in [20, 30]:
+            positive_preferences.append(shifts[(sj_idx, d, 0)])
+
+        # AM (Amirtha)
+        # Will do night duty on 21st 23rd
         positive_preferences.append(shifts[(am_idx, 21, 2)])
         positive_preferences.append(shifts[(am_idx, 23, 2)])
 
-        preference_score = model.NewIntVar(-500, 500, 'preference_score')
+        # MH (Mohan)
+        # N -6, 7, 28, 29
+        for d in [6, 7, 28, 29]:
+            positive_preferences.append(shifts[(mh_idx, d, 2)])
+        # D- 1, 2, 3, 5, 8, 10, 12, 15, 16, 17, 19, 22, 23, 31.
+        for d in [1, 2, 3, 5, 8, 10, 12, 15, 16, 17, 19, 22, 23, 31]:
+            positive_preferences.append(shifts[(mh_idx, d, 0)])
+
+        preference_score = model.NewIntVar(-1000, 1000, 'preference_score')
         model.Add(preference_score == sum(positive_preferences) - sum(negative_preferences))
 
         return preference_score

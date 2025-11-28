@@ -1,0 +1,412 @@
+{
+    "1": {
+        "morning": [
+            "SJ",
+            "MNS"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "PS",
+            "PK"
+        ]
+    },
+    "2": {
+        "morning": [
+            "MJ",
+            "SJ"
+        ],
+        "afternoon": [
+            "MNS"
+        ],
+        "night": [
+            "MH",
+            "SK"
+        ]
+    },
+    "3": {
+        "morning": [
+            "SJ",
+            "MNS"
+        ],
+        "afternoon": [
+            "PS"
+        ],
+        "night": [
+            "SK",
+            "MJ"
+        ]
+    },
+    "4": {
+        "morning": [
+            "AM",
+            "MNS"
+        ],
+        "afternoon": [
+            "SB"
+        ],
+        "night": [
+            "MT",
+            "SJ"
+        ]
+    },
+    "5": {
+        "morning": [
+            "PS",
+            "MH",
+            "MNS"
+        ],
+        "afternoon": [],
+        "night": [
+            "SB",
+            "AM"
+        ]
+    },
+    "6": {
+        "morning": [
+            "MH",
+            "MT"
+        ],
+        "afternoon": [
+            "MJ"
+        ],
+        "night": [
+            "PK",
+            "MNS"
+        ]
+    },
+    "7": {
+        "morning": [
+            "MJ",
+            "SJ"
+        ],
+        "afternoon": [
+            "SB"
+        ],
+        "night": [
+            "PS",
+            "MH"
+        ]
+    },
+    "8": {
+        "morning": [
+            "MT",
+            "MJ",
+            "SJ"
+        ],
+        "afternoon": [
+            "MNS"
+        ],
+        "night": [
+            "SK",
+            "SB"
+        ]
+    },
+    "9": {
+        "morning": [
+            "AM",
+            "SJ"
+        ],
+        "afternoon": [
+            "PS"
+        ],
+        "night": [
+            "MT",
+            "MJ"
+        ]
+    },
+    "10": {
+        "morning": [
+            "MH",
+            "SJ"
+        ],
+        "afternoon": [
+            "SB"
+        ],
+        "night": [
+            "AM",
+            "MNS"
+        ]
+    },
+    "11": {
+        "morning": [
+            "MH",
+            "SK"
+        ],
+        "afternoon": [
+            "PK"
+        ],
+        "night": [
+            "PS",
+            "SB"
+        ]
+    },
+    "12": {
+        "morning": [
+            "AM",
+            "MJ",
+            "MNS"
+        ],
+        "afternoon": [],
+        "night": [
+            "MH",
+            "PK"
+        ]
+    },
+    "13": {
+        "morning": [
+            "MT",
+            "MNS"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "PS",
+            "MJ"
+        ]
+    },
+    "14": {
+        "morning": [
+            "MH",
+            "SJ"
+        ],
+        "afternoon": [
+            "MT"
+        ],
+        "night": [
+            "SK",
+            "SB"
+        ]
+    },
+    "15": {
+        "morning": [
+            "PS",
+            "MH",
+            "PK"
+        ],
+        "afternoon": [
+            "MJ"
+        ],
+        "night": [
+            "SJ",
+            "MNS"
+        ]
+    },
+    "16": {
+        "morning": [
+            "MH",
+            "AM"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "PK",
+            "MT"
+        ]
+    },
+    "17": {
+        "morning": [
+            "PS",
+            "MH",
+            "MJ"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "SB",
+            "AM"
+        ]
+    },
+    "18": {
+        "morning": [
+            "PK",
+            "SK",
+            "MT"
+        ],
+        "afternoon": [
+            "MJ"
+        ],
+        "night": [
+            "PS",
+            "SJ"
+        ]
+    },
+    "19": {
+        "morning": [
+            "MH",
+            "PK",
+            "SB"
+        ],
+        "afternoon": [],
+        "night": [
+            "MT",
+            "MJ"
+        ]
+    },
+    "20": {
+        "morning": [
+            "MH",
+            "AM",
+            "SJ"
+        ],
+        "afternoon": [
+            "PS"
+        ],
+        "night": [
+            "SB",
+            "MNS"
+        ]
+    },
+    "21": {
+        "morning": [
+            "PS",
+            "AM",
+            "MT"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "MH",
+            "SJ"
+        ]
+    },
+    "22": {
+        "morning": [
+            "PK",
+            "AM",
+            "MT"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "SB",
+            "MNS"
+        ]
+    },
+    "23": {
+        "morning": [
+            "PS",
+            "MH",
+            "AM"
+        ],
+        "afternoon": [
+            "MT"
+        ],
+        "night": [
+            "SK",
+            "SJ"
+        ]
+    },
+    "24": {
+        "morning": [
+            "SB",
+            "MJ"
+        ],
+        "afternoon": [
+            "MT"
+        ],
+        "night": [
+            "PK",
+            "AM"
+        ]
+    },
+    "25": {
+        "morning": [
+            "SK",
+            "SJ"
+        ],
+        "afternoon": [
+            "MT"
+        ],
+        "night": [
+            "PS",
+            "MJ"
+        ]
+    },
+    "26": {
+        "morning": [
+            "SK",
+            "SJ"
+        ],
+        "afternoon": [],
+        "night": [
+            "AM",
+            "MNS"
+        ]
+    },
+    "27": {
+        "morning": [
+            "PS",
+            "MH",
+            "SB"
+        ],
+        "afternoon": [
+            "PK"
+        ],
+        "night": [
+            "SK",
+            "MJ"
+        ]
+    },
+    "28": {
+        "morning": [
+            "MH",
+            "SB"
+        ],
+        "afternoon": [
+            "PK"
+        ],
+        "night": [
+            "SJ",
+            "MNS"
+        ]
+    },
+    "29": {
+        "morning": [
+            "MH",
+            "PK",
+            "SB"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "MT",
+            "MJ"
+        ]
+    },
+    "30": {
+        "morning": [
+            "PS",
+            "SB",
+            "AM"
+        ],
+        "afternoon": [
+            "MNS"
+        ],
+        "night": [
+            "PK",
+            "MT"
+        ]
+    },
+    "31": {
+        "morning": [
+            "SB",
+            "MJ",
+            "MNS"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "PS",
+            "AM"
+        ]
+    }
+}

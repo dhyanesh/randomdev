@@ -14,7 +14,7 @@ class TestRosterConstraints(unittest.TestCase):
         #     'PK': [datetime.date(cls.year, 9, 5), datetime.date(cls.year, 9, 6)],
         #     'MNS': [datetime.date(cls.year, 9, 10)],
         # }
-        cls.roster = generate_roster_cp(cls.year, cls.month)
+        cls.roster, _ = generate_roster_cp(cls.year, cls.month)
         
         # Manually add HOD for testing purposes, mimicking the post-processing step
         if cls.roster:

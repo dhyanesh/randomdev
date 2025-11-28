@@ -140,62 +140,15 @@ def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=Non
 
     # --- Apply constraints ---
     constraints_handler = get_constraints_handler(year, month)
-    cl_days_per_consultant, preference_score = constraints_handler.apply_all_constraints(
+    cl_days_per_consultant = constraints_handler.apply_all_constraints(
         model, shifts, CONSULTANTS, all_days, all_shifts, year, month, previous_month_roster
     )
 
-    # --- Define Soft Constraints (Objectives) ---
-
-    # 1. Weekend Distribution Preference
-    weekend_days = [d for d in all_days if datetime.date(year, month, d).weekday() >= 5]
-    weekend_shifts_per_consultant = [sum(shifts[(c, d, s)] for d in weekend_days for s in all_shifts) for c in all_consultants]
-    min_weekend_shifts = model.NewIntVar(0, num_days, 'min_weekend_shifts')
-    max_weekend_shifts = model.NewIntVar(0, num_days, 'max_weekend_shifts')
-    model.AddMinEquality(min_weekend_shifts, weekend_shifts_per_consultant)
-    model.AddMaxEquality(max_weekend_shifts, weekend_shifts_per_consultant)
-    weekend_fairness_diff = max_weekend_shifts - min_weekend_shifts
-
-    # 2. Working Hours Target
-    total_hours_deviations = []
-    for c_idx, c in enumerate(CONSULTANTS):
-        consultant_initial = CONSULTANTS[c_idx].initial
-        cl_days = cl_days_per_consultant.get(consultant_initial, 0)
-        target_hours = 192 - (cl_days * 8)
-
-        total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-        model.Add(total_hours_expr <= target_hours + 40) # Relaxed Hard constraint (Overtime allowed)
-        model.Add(total_hours_expr >= target_hours - 50) # Relaxed Hard constraint (Undertime allowed)
-        
-        # Soft constraint to be close to target
-        deviation = model.NewIntVar(0, 100, f'deviation_c{c_idx}')
-        model.AddAbsEquality(deviation, total_hours_expr - target_hours)
-        total_hours_deviations.append(deviation)
-
-    total_hours_deviation = model.NewIntVar(0, 1000, 'total_hours_deviation')
-    model.Add(total_hours_deviation == sum(total_hours_deviations))
-
-    # 3. Night Shift Fairness Preference
-    fair_night_consultants = [i for i, c in enumerate(CONSULTANTS) if c.initial != 'MH']
-    night_shifts_per_consultant = [sum(shifts[(c, d, 2)] for d in all_days) for c in fair_night_consultants]
-    min_night_shifts = model.NewIntVar(0, num_days, 'min_night_shifts')
-    max_night_shifts = model.NewIntVar(0, num_days, 'max_night_shifts')
-    model.AddMinEquality(min_night_shifts, night_shifts_per_consultant)
-    model.AddMaxEquality(max_night_shifts, night_shifts_per_consultant)
-    nights_fairness_diff = max_night_shifts - min_night_shifts
-
-    # 4. Consecutive Night Shift Preference
-    consecutive_night_vars = []
-    for c in all_consultants:
-        for d in all_days[:-1]:
-            lit1 = shifts[(c, d, 2)]
-            lit2 = shifts[(c, d + 1, 2)]
-            consecutive = model.NewBoolVar(f'consecutive_c{c}_d{d}')
-            model.AddBoolAnd([lit1, lit2]).OnlyEnforceIf(consecutive)
-            model.AddBoolOr([lit1.Not(), lit2.Not()]).OnlyEnforceIf(consecutive.Not())
-            consecutive_night_vars.append(consecutive)
-
     # --- Set Objective Function ---
-    model.Minimize(weekend_fairness_diff * 4 + total_hours_deviation + nights_fairness_diff * 4 - preference_score + sum(consecutive_night_vars) * 10)
+    objective_expression = constraints_handler.get_objective_expression(
+        model, shifts, CONSULTANTS, all_days, all_shifts, year, month
+    )
+    model.Minimize(objective_expression)
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()

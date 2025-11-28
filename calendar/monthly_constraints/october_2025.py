@@ -115,7 +115,7 @@ class October2025Constraints(MonthlyConstraints):
         model.Add(shifts[(mh_idx, 18, 0)] == 0)
         model.Add(shifts[(mh_idx, 6, 0)] == 1)
 
-    def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+    def calculate_preference_score(self, model, shifts, consultants, all_days, all_shifts, year, month):
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
         ps_idx = consultant_map['PS']
         mh_idx = consultant_map['MH']

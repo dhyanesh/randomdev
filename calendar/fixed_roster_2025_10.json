@@ -1,0 +1,66 @@
+{
+    "1": {
+        "morning": [
+            "SJ",
+            "MNS"
+        ],
+        "afternoon": [
+            "SK"
+        ],
+        "night": [
+            "PS",
+            "PK"
+        ]
+    },
+    "2": {
+        "morning": [
+            "MJ",
+            "SJ"
+        ],
+        "afternoon": [
+            "MNS"
+        ],
+        "night": [
+            "MH",
+            "SK"
+        ]
+    },
+    "3": {
+        "morning": [
+            "SJ",
+            "MNS"
+        ],
+        "afternoon": [
+            "PS"
+        ],
+        "night": [
+            "SK",
+            "MJ"
+        ]
+    },
+    "4": {
+        "morning": [
+            "AM",
+            "MNS"
+        ],
+        "afternoon": [
+            "SB"
+        ],
+        "night": [
+            "MT",
+            "SJ"
+        ]
+    },
+    "5": {
+        "morning": [
+            "PS",
+            "MH",
+            "MNS"
+        ],
+        "afternoon": [],
+        "night": [
+            "SB",
+            "AM"
+        ]
+    }
+}

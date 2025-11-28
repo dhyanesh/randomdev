@@ -1,0 +1,44 @@
+Consultant: DR. PRAVEEN. S
+Request: I prefer night shifts on 7, 10, 11, 13, 18, 25, 31.
+Request: I prefer day or noon shifts on 3, 6, 9, 15, 21, 27, 30.
+Request: I prefer day shifts on 17, 23.
+
+Consultant: DR. MOHAN
+Request: I prefer night shifts on 2, 7, 12, 21.
+Request: I prefer morning shifts on 5, 6, 9, 10, 14, 15, 16, 17, 20, 23, 27, 28, 29, 30.
+
+Consultant: DR. PRAVEEN KUMAR
+Request: I need leave on 20, 25, 26.
+Request: I need 4 days casual leave from October 2nd to 5th.
+
+Consultant: DR. SANTOSH
+Request: I prefer all Saturday mornings and 2 Sunday mornings.
+Request: I prefer weekdays afternoon duties.
+Request: I want to avoid weekend nights.
+
+Consultant: DR. SHIVA SHANKAR.B
+Request: I need leave on 1st, 2nd, 3rd.
+Request: I need leave on 25th, 26th.
+Request: I prefer morning duty on 29th.
+Request: I prefer morning duty on 30th.
+
+Consultant: DR. AMRITHA
+Request: I need leave on 1st, 2nd, 3rd, 6th, 7th, 8th.
+Request: I need leave on 13th, 14th, 15th, 27th, 28th, 29th.
+Request: I prefer day shift on 4th, 19th, 20th.
+Request: I prefer night shift on 5th, 12th.
+
+Consultant: DR. MITTAL
+Request: I need to be off Oct 1,2,3. Taking 2 casual leaves.
+Request:  No morning shift for me on Oct 14th.
+
+Consultant: DR. MANJUNATH
+Request: I need leave on 20, 21, 22, 23.
+Request: I prefer leave on 1st.
+Request: I prefer leave on 4th, 5th.
+
+Consultant: DR. SIMMY JOHN
+Request: I need leave on 11, 12, 13.
+Request: I prefer morning duty on 20th.
+Request: I prefer 4 days in a row for morning duties on weekdays.
+Request: I can do two noon shifts (12-8).

@@ -107,7 +107,7 @@ class November2025Constraints(MonthlyConstraints):
         # Mittal 6 nights
         model.Add(sum(shifts[(mt_idx, d, 2)] for d in all_days) == 6)
 
-    def apply_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
+    def calculate_preference_score(self, model, shifts, consultants, all_days, all_shifts, year, month):
         consultant_map = {c.initial: i for i, c in enumerate(consultants)}
         ps_idx = consultant_map['PS']
         mh_idx = consultant_map['MH']
