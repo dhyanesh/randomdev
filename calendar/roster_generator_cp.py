@@ -223,7 +223,7 @@ def get_statistics(roster, year, month, cl_days_per_consultant):
     
     # Add HOD stats
     num_days = calendar.monthrange(year, month)[1]
-    hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6 and (i < 5 or i > 15))
+    hod_mornings = sum(1 for i in range(1, num_days + 1) if datetime.date(year, month, i).weekday() < 6)
     hod_hours = hod_mornings * 5
     stats_rows.append(['Dr. BHARGAVA', hod_mornings, 0, 0, hod_hours])
     
