@@ -40,7 +40,7 @@ python roster_generator_cp.py -y <year> -m <month> [options]
 - `--force-regenerate`: Force regeneration of the roster, ignoring any cached version.
 
 **Features:**
-- **October 2025 Requests:** Specific leave and shift preferences for October 2025 are hardcoded.
+- **Month-Specific Requests:** Specific leave and shift preferences for each month are handled by dedicated constraint classes (e.g., `December2025Constraints`).
 - **Google Sheets Export:** Can create or update a Google Sheet with the roster and statistics.
 - **Local Caching:** Caches the generated roster locally to speed up subsequent runs.
 """
