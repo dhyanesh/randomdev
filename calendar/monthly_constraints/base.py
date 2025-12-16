@@ -118,6 +118,17 @@ class MonthlyConstraints:
             model.Add(shifts[(am_index, d, 1)] == 0)
             model.Add(shifts[(sj_index, d, 1)] == 0)
 
+            # Prevent AM and MT from working on the same shift "side" (Day/Afternoon vs Night)
+            # They CAN work on the same day if one is Day/Afternoon and the other is Night.
+            
+            # 1. Cannot both be on Morning/Afternoon side
+            am_day_side = shifts[(am_index, d, 0)] + shifts[(am_index, d, 1)]
+            mt_day_side = shifts[(mittal_index, d, 0)] + shifts[(mittal_index, d, 1)]
+            model.Add(am_day_side + mt_day_side <= 1)
+            
+            # 2. Cannot both be on Night side
+            model.Add(shifts[(am_index, d, 2)] + shifts[(mittal_index, d, 2)] <= 1)
+
             date = datetime.date(year, month, d)
             if date.weekday() == 0 or date.weekday() == 2:
                 model.Add(shifts[(mittal_index, d, 2)] == 0)

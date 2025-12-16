@@ -58,6 +58,7 @@ from monthly_constraints.base import MonthlyConstraints
 from monthly_constraints.october_2025 import October2025Constraints
 from monthly_constraints.november_2025 import November2025Constraints
 from monthly_constraints.december_2025 import December2025Constraints
+from monthly_constraints.january_2026 import January2026Constraints
 from google.cloud import storage
 
 
@@ -108,6 +109,8 @@ def get_constraints_handler(year, month):
         return November2025Constraints()
     if year == 2025 and month == 12:
         return December2025Constraints()
+    if year == 2026 and month == 1:
+        return January2026Constraints()
     return MonthlyConstraints()
 
 def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=None):
