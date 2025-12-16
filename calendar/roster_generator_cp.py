@@ -275,9 +275,10 @@ def export_to_gsheet(roster, stats_data, year, month, service_account_file='your
     except gspread.exceptions.SpreadsheetNotFound:
         print(f"Creating new spreadsheet: '{sheet_title}'")
         spreadsheet = client.create(sheet_title)
-        if share_email:
-            print(f"Sharing sheet with {share_email}...")
-            spreadsheet.share(share_email, perm_type='user', role='writer')
+
+    if share_email:
+        print(f"Sharing sheet with {share_email}...")
+        spreadsheet.share(share_email, perm_type='user', role='writer')
 
     try:
         worksheet = spreadsheet.worksheet(worksheet_name)
