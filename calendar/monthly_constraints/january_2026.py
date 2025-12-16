@@ -52,8 +52,8 @@ class January2026Constraints(MonthlyConstraints):
         for c_idx, c in enumerate(consultants):
             if c.initial != 'MH' and c.initial not in special_night_consultants:
                 num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
-                # User request: Everyone gets 6 nights (Impossible strictly, so 5-7)
-                model.Add(num_nights >= 5)
+                # User request: Everyone gets 6 nights (Strictly >= 6)
+                model.Add(num_nights >= 6)
                 model.Add(num_nights <= 7)
 
     def apply_leave_constraints(self, model, shifts, consultants, all_days, all_shifts):
