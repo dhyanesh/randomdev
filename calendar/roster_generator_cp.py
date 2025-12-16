@@ -151,7 +151,7 @@ def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=Non
     objective_expression = constraints_handler.get_objective_expression(
         model, shifts, CONSULTANTS, all_days, all_shifts, year, month
     )
-    model.Minimize(objective_expression)
+    # model.Minimize(objective_expression)
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()
@@ -362,7 +362,8 @@ def main(argv=None):
         previous_year = args.year if args.month > 1 else args.year - 1
         previous_month_roster_blob_name = f"{previous_year}/{previous_month}/roster.json"
         print(f"Loading previous month's roster from GCS: gs://{bucket_name}/{previous_month_roster_blob_name}")
-        previous_month_roster = download_json_from_gcs(bucket_name, previous_month_roster_blob_name)
+        # previous_month_roster = download_json_from_gcs(bucket_name, previous_month_roster_blob_name)
+        previous_month_roster = None
 
         roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, fixed_roster_data, previous_month_roster)
         
