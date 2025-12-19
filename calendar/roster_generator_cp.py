@@ -29,7 +29,7 @@ The script is run from the command line with the year and month.
 
 **Command:**
 ```bash
-python roster_generator_cp.py -y <year> -m <month> [options]
+/home/dhyanesh/dev/calendar/venv/bin/python roster_generator_cp.py -y <year> -m <month> [options]
 ```
 
 **Arguments:**

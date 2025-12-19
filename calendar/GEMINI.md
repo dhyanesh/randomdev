@@ -37,7 +37,7 @@ The `roster_generator_cp.py` script generates a duty roster.
 **Running the script:**
 
 ```bash
-python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
+/home/dhyanesh/dev/calendar/venv/bin/python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
@@ -62,7 +62,7 @@ The `trilife_shifts.py` script parses a PDF roster and creates a schedule in Goo
 **Running the script:**
 
 ```bash
-python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-calendar
+/home/dhyanesh/dev/calendar/venv/bin/python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-calendar
 ```
 
 *   `<consultant_name>`: The name of the consultant (e.g., "Mittal").
@@ -83,7 +83,7 @@ The `import_roster_to_calendar.py` script imports a roster from a Google Sheet a
 **Running the script:**
 
 ```bash
-python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_name>
+/home/dhyanesh/dev/calendar/venv/bin/python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_name>
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
