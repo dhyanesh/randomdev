@@ -41,8 +41,8 @@ class MonthlyConstraints:
             consultant_cl_days = cl_days.get(c.initial, 0)
             target_hours = 192 - (consultant_cl_days * 8)
             total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-            model.Add(total_hours_expr <= target_hours) # Hard constraint
-            model.Add(total_hours_expr >= target_hours - 16) # Hard constraint with wider window
+            model.Add(total_hours_expr <= 200) # Hard constraint
+            model.Add(total_hours_expr >= target_hours - 32) # Hard constraint with wider window
 
     def calculate_general_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         num_days = len(all_days)
@@ -100,13 +100,12 @@ class MonthlyConstraints:
 
     def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         for d in all_days:
-            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) >= 2)
-            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) <= 3)
+            # Morning: Exactly 3 people
+            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) == 3)
+            
             date = datetime.date(year, month, d)
-            if date.weekday() < 6:
-                model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 1)
-            else:
-                model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 0)
+            # Afternoon: Optional (0 or 1) on all days
+            model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) <= 1)
             model.Add(sum(shifts[(c, d, 2)] for c in range(len(consultants))) == 2)
 
     def apply_consultant_specific_shift_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
@@ -145,6 +144,12 @@ class MonthlyConstraints:
             model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
             model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
             model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
+            
+            # No back-to-back night shifts
+            if d < len(all_days):
+                for c_idx, c in enumerate(consultants):
+                    if c.initial != 'MH':
+                        model.Add(shifts[(c_idx, d, 2)] + shifts[(c_idx, d + 1, 2)] <= 1)
 
         model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
 
@@ -152,7 +157,7 @@ class MonthlyConstraints:
         for c_idx, c in enumerate(consultants):
             if c.initial != 'MH' and c.initial not in special_night_consultants:
                 num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
-                model.Add(num_nights >= 5)
+                model.Add(num_nights >= 6)
                 model.Add(num_nights <= 7)
 
     def apply_post_night_duty_constraints(self, model, shifts, consultants, all_days, all_shifts, previous_month_roster=None):

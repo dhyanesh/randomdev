@@ -12,24 +12,20 @@ class January2026Constraints(MonthlyConstraints):
 
     def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         for d in all_days:
-            # Morning: 2-3 people (Relaxed for Jan 1 to >= 1 due to high unavailability)
+            # Morning: Exactly 3 people (Relaxed for Jan 1 to >= 2 due to high unavailability)
             if d == 1:
-                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) >= 1)
-                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) <= 3)
-            else:
                 model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) >= 2)
                 model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) <= 3)
+            else:
+                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) == 3)
             
-            # Afternoon: 1 person on weekdays, 0 on weekends
-            date = datetime.date(year, month, d)
-            if date.weekday() < 6: # Monday to Saturday
-                model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 1)
-            else: # Sunday
-                model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 0)
+            # Afternoon: Optional (0 or 1) on all days
+            model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) <= 1)
             
             # Night: Exactly 2 people
             model.Add(sum(shifts[(c, d, 2)] for c in range(len(consultants))) == 2)
 
+    # Override base night shift constraints to relax senior rule and enforce no back-to-back for Jan 2026
     def apply_night_shift_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         senior_indices = [i for i, c in enumerate(consultants) if c.is_senior]
         female_indices = [i for i, c in enumerate(consultants) if c.gender == 'Female']
@@ -37,14 +33,17 @@ class January2026Constraints(MonthlyConstraints):
         mh_index = next(i for i, c in enumerate(consultants) if c.initial == 'MH')
 
         for d in all_days:
-            model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
+            # Relaxed senior constraint: Not strictly enforced for Jan 2026
+            # model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
+            
             model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
-            # AM and MH exclusion is handled in base/apply_consultant_specific... now?
-            # base.py apply_night_shift_constraints had:
-            # model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
-            # I should keep it or let the new base logic handle it?
-            # The new base logic handles "exclusive sides". But specific night exclusion is fine too.
             model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
+            
+            # No back-to-back night shifts - ENFORCED for Jan 2026 (Excluding MH due to fixed schedule)
+            if d < len(all_days):
+                for c_idx, c in enumerate(consultants):
+                    if c.initial != 'MH':
+                        model.Add(shifts[(c_idx, d, 2)] + shifts[(c_idx, d + 1, 2)] <= 1)
 
         model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
 
@@ -52,13 +51,9 @@ class January2026Constraints(MonthlyConstraints):
         for c_idx, c in enumerate(consultants):
             if c.initial != 'MH' and c.initial not in special_night_consultants:
                 num_nights = sum(shifts[(c_idx, d, 2)] for d in all_days)
-                # User request: Everyone gets 6 nights (Strictly >= 6)
+                # Ensure at least 6 nights for everyone except MH
                 model.Add(num_nights >= 6)
-                
-                if c.initial == 'AM':
-                    model.Add(num_nights <= 6)
-                else:
-                    model.Add(num_nights <= 7)
+                model.Add(num_nights <= 7)
 
     def apply_leave_constraints(self, model, shifts, consultants, all_days, all_shifts):
         # Override to allow long leaves
@@ -189,20 +184,21 @@ class January2026Constraints(MonthlyConstraints):
         positive_preferences.append(shifts[(sj_idx, 22, 0)])
 
         # --- Praveen Sr (PS) ---
-        # Plz give days on 5 10 13 16 22 25 29 30
+        # Plz give days on 5 10 13 16 22 25 29 30 (Weight: 1000 each)
         for d in [5, 10, 13, 16, 22, 25, 29, 30]:
-            positive_preferences.append(shifts[(ps_idx, d, 0)])
+            positive_preferences.append(shifts[(ps_idx, d, 0)] * 1000)
         
-        # Nights on 2 7 11 17 19 23 26 31
+        # Nights on 2 7 11 17 19 23 26 31 (Weight: 1000 each)
         for d in [2, 7, 11, 17, 19, 23, 26, 31]:
-            positive_preferences.append(shifts[(ps_idx, d, 2)])
+            positive_preferences.append(shifts[(ps_idx, d, 2)] * 1000)
 
         # --- Shiva (SB) ---
         # Night duty on 11th please
         positive_preferences.append(shifts[(sb_idx, 11, 2)])
 
         if positive_preferences:
-             preference_score = model.NewIntVar(-1000, 1000, 'preference_score')
+             # Increase range to accommodate high scores
+             preference_score = model.NewIntVar(-100000, 100000, 'preference_score')
              model.Add(preference_score == sum(positive_preferences))
              return preference_score
         
