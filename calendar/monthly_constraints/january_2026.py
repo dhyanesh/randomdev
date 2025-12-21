@@ -70,14 +70,7 @@ class January2026Constraints(MonthlyConstraints):
         # Override to disable Simmy's consecutive shift constraint
         pass
 
-    def apply_post_night_duty_constraints(self, model, shifts, consultants, all_days, all_shifts, previous_month_roster=None):
-        # Standard post-night duty constraint
-        for c in range(len(consultants)):
-            for d in all_days[:-1]:
-                model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 0)] <= 1)
-                model.Add(shifts[(c, d, 2)] + shifts[(c, d + 1, 1)] <= 1)
 
-        # Removed previous month check to resolve infeasibility
 
     def apply_working_hours_constraints(self, model, shifts, consultants, all_days, all_shifts, cl_days):
         for c_idx, c in enumerate(consultants):
@@ -152,14 +145,13 @@ class January2026Constraints(MonthlyConstraints):
         # Night: 10, 11, 24, 25 (Hard)
         for d in [10, 11, 24, 25]:
             model.Add(shifts[(mh_idx, d, 2)] == 1)
-        # Day: 2, 5, 6, 7, 9, 16, 19, 20, 21, 23, 27, 28, 29, 31 (Hard)
-        for d in [2, 5, 6, 7, 9, 16, 19, 20, 21, 23, 27, 28, 29, 31]:
+        # Day: 5, 6, 7, 9, 16, 19, 20, 21, 23, 27, 28, 29, 31 (Hard)
+        for d in [5, 6, 7, 9, 16, 19, 20, 21, 23, 27, 28, 29, 31]:
             model.Add(shifts[(mh_idx, d, 0)] == 1)
 
         # --- Manjunath Junior (MJ) ---
         # Negative dates (Off): 13, 14, 15
-        # Off on 1st Jan
-        for d in [1, 13, 14, 15]:
+        for d in [13, 14, 15]:
             for s in all_shifts:
                 model.Add(shifts[(mj_idx, d, s)] == 0)
 

@@ -172,6 +172,7 @@ class MonthlyConstraints:
                 if c.initial in previous_month_roster[last_day_of_previous_month]['night']:
                     model.Add(shifts[(c_idx, 1, 0)] == 0)
                     model.Add(shifts[(c_idx, 1, 1)] == 0)
+                    model.Add(shifts[(c_idx, 1, 2)] == 0)
 
     def apply_leave_constraints(self, model, shifts, consultants, all_days, all_shifts):
         for c in range(len(consultants)):

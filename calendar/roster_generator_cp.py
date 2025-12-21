@@ -362,8 +362,9 @@ def main(argv=None):
         previous_year = args.year if args.month > 1 else args.year - 1
         previous_month_roster_blob_name = f"{previous_year}/{previous_month}/roster.json"
         print(f"Loading previous month's roster from GCS: gs://{bucket_name}/{previous_month_roster_blob_name}")
-        # previous_month_roster = download_json_from_gcs(bucket_name, previous_month_roster_blob_name)
-        previous_month_roster = None
+        previous_month_roster_data = download_json_from_gcs(bucket_name, previous_month_roster_blob_name)
+        previous_month_roster = {int(k): v for k, v in previous_month_roster_data.items()} if previous_month_roster_data else None
+        # previous_month_roster = None
 
         roster, cl_days_per_consultant = generate_roster_cp(args.year, args.month, fixed_roster_data, previous_month_roster)
         
