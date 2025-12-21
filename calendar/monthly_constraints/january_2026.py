@@ -10,6 +10,9 @@ class January2026Constraints(MonthlyConstraints):
         # Specific CL requests (inferred from off days or explicit mentions)
         return {}
 
+    def get_special_night_consultants(self):
+        return ['PS']
+
     def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         for d in all_days:
             # Morning: Exactly 3 people (Relaxed for Jan 1 to >= 2 due to high unavailability)
@@ -31,6 +34,7 @@ class January2026Constraints(MonthlyConstraints):
         female_indices = [i for i, c in enumerate(consultants) if c.gender == 'Female']
         am_index = next(i for i, c in enumerate(consultants) if c.initial == 'AM')
         mh_index = next(i for i, c in enumerate(consultants) if c.initial == 'MH')
+        ps_index = next(i for i, c in enumerate(consultants) if c.initial == 'PS')
 
         for d in all_days:
             # Relaxed senior constraint: Not strictly enforced for Jan 2026
@@ -46,6 +50,9 @@ class January2026Constraints(MonthlyConstraints):
                         model.Add(shifts[(c_idx, d, 2)] + shifts[(c_idx, d + 1, 2)] <= 1)
 
         model.Add(sum(shifts[(mh_index, d, 2)] for d in all_days) == 4)
+        
+        # PS has exactly 8 nights (hard constraint requests)
+        model.Add(sum(shifts[(ps_index, d, 2)] for d in all_days) == 8)
 
         special_night_consultants = self.get_special_night_consultants()
         for c_idx, c in enumerate(consultants):
@@ -109,6 +116,14 @@ class January2026Constraints(MonthlyConstraints):
         # Avoid Day/Afternoon on 21st Jan (Night is allowed)
         model.Add(shifts[(mt_idx, 21, 0)] == 0)
         model.Add(shifts[(mt_idx, 21, 1)] == 0)
+
+        # --- Praveen Sr (PS) ---
+        # Night duties (Hard constraints)
+        for d in [2, 7, 11, 17, 19, 23, 26, 31]:
+            model.Add(shifts[(ps_idx, d, 2)] == 1)
+        # Morning duties (Hard constraints)
+        for d in [5, 10, 13, 16]:
+            model.Add(shifts[(ps_idx, d, 0)] == 1)
 
         # --- Simmy (SJ) ---
         # Off days: 1, 10, 11, 23, 24
@@ -185,13 +200,9 @@ class January2026Constraints(MonthlyConstraints):
 
         # --- Praveen Sr (PS) ---
         # Plz give days on 5 10 13 16 22 25 29 30 (Weight: 1000 each)
-        for d in [5, 10, 13, 16, 22, 25, 29, 30]:
+        for d in [22, 25, 29, 30]:
             positive_preferences.append(shifts[(ps_idx, d, 0)] * 1000)
         
-        # Nights on 2 7 11 17 19 23 26 31 (Weight: 1000 each)
-        for d in [2, 7, 11, 17, 19, 23, 26, 31]:
-            positive_preferences.append(shifts[(ps_idx, d, 2)] * 1000)
-
         # --- Shiva (SB) ---
         # Night duty on 11th please
         positive_preferences.append(shifts[(sb_idx, 11, 2)])
