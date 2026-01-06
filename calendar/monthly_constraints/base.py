@@ -39,10 +39,12 @@ class MonthlyConstraints:
     def apply_working_hours_constraints(self, model, shifts, consultants, all_days, all_shifts, cl_days):
         for c_idx, c in enumerate(consultants):
             consultant_cl_days = cl_days.get(c.initial, 0)
-            target_hours = 192 - (consultant_cl_days * 8)
+            # Target is 192 reduced by 8 hours for each CL
+            # Lower bound is Target - 8
+            lower_bound = 192 - (consultant_cl_days * 8) - 8
             total_hours_expr = sum(shifts[(c_idx, d, 0)] * 9 + shifts[(c_idx, d, 1)] * 8 + shifts[(c_idx, d, 2)] * 15 for d in all_days)
-            model.Add(total_hours_expr <= 200) # Hard constraint
-            model.Add(total_hours_expr >= target_hours - 32) # Hard constraint with wider window
+            model.Add(total_hours_expr <= 192)
+            model.Add(total_hours_expr >= lower_bound)
 
     def calculate_general_soft_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
         num_days = len(all_days)
@@ -142,7 +144,7 @@ class MonthlyConstraints:
 
         for d in all_days:
             model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
-            model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
+            # model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
             model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
             
             # No back-to-back night shifts

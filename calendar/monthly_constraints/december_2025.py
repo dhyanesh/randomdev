@@ -33,14 +33,9 @@ class December2025Constraints(MonthlyConstraints):
         pass
 
     def apply_shift_size_constraints(self, model, shifts, consultants, all_days, all_shifts, year, month):
-        # Override to enforce exactly 2 consultants in the morning, 0 in afternoon
         for d in all_days:
-            # Morning: Exactly 2 people (Relaxed for Day 1 due to unavailability of PS/AM/PK/SB/SK/MNS)
-            if d == 1:
-                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) >= 1)
-                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) <= 2)
-            else:
-                model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) == 2)
+            # Morning: Exactly 3 people
+            model.Add(sum(shifts[(c, d, 0)] for c in range(len(consultants))) == 3)
             
             # Afternoon: 0 people every day (User request)
             model.Add(sum(shifts[(c, d, 1)] for c in range(len(consultants))) == 0)
@@ -56,7 +51,7 @@ class December2025Constraints(MonthlyConstraints):
 
         for d in all_days:
             # model.Add(sum(shifts[(c, d, 2)] for c in senior_indices) >= 1)
-            model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
+            # model.Add(sum(shifts[(c, d, 2)] for c in female_indices) <= 1)
             model.Add(shifts[(am_index, d, 2)] + shifts[(mh_index, d, 2)] <= 1)
 
         # Relaxed MH constraint - Max 4 nights (Hard constraint)

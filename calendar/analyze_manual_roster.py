@@ -150,11 +150,10 @@ def check_constraints(roster, requests):
         if len(nights) != 2:
             violations.append(f"Day {d}: Night shift {nights} does not have exactly 2 consultants.")
         
-        # 13. No two females on night
-        females = [c for c in nights if c in CONSULTANTS and CONSULTANTS[c]['gender'] == 'Female']
-        if len(females) > 1:
-            violations.append(f"Day {d}: Two female consultants on night shift: {females}")
-
+            # 13. No two females on night
+            # females = [c for c in nights if c in CONSULTANTS and CONSULTANTS[c]['gender'] == 'Female']
+            # if len(females) > 1:
+            #     violations.append(f"Day {d}: Two female consultants on night shift: {females}")
         # 10. Afternoon: 0 or 1. Zero on Sundays.
         if len(afternoon) > 1:
             violations.append(f"Day {d}: More than 1 consultant in afternoon: {afternoon}")

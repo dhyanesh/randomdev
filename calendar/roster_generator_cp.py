@@ -155,6 +155,7 @@ def generate_roster_cp(year, month, fixed_roster=None, previous_month_roster=Non
 
     # --- Solve the model ---
     solver = cp_model.CpSolver()
+    solver.parameters.num_search_workers = 8
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
@@ -354,9 +355,14 @@ def main(argv=None):
         print("Generating new roster...")
         fixed_roster_data = None
         if args.fixed_roster:
-            fixed_roster_blob_name = f"{args.year}/{args.month}/fixed_roster.json"
-            print(f"Loading fixed roster from GCS: gs://{bucket_name}/{fixed_roster_blob_name}")
-            fixed_roster_data = download_json_from_gcs(bucket_name, fixed_roster_blob_name)
+            if Path(args.fixed_roster).exists():
+                 print(f"Loading fixed roster from local file: {args.fixed_roster}")
+                 with open(args.fixed_roster, 'r') as f:
+                     fixed_roster_data = json.load(f)
+            else:
+                fixed_roster_blob_name = f"{args.year}/{args.month}/fixed_roster.json"
+                print(f"Loading fixed roster from GCS: gs://{bucket_name}/{fixed_roster_blob_name}")
+                fixed_roster_data = download_json_from_gcs(bucket_name, fixed_roster_blob_name)
 
         previous_month = args.month - 1 if args.month > 1 else 12
         previous_year = args.year if args.month > 1 else args.year - 1
@@ -371,6 +377,11 @@ def main(argv=None):
         if roster:
             print(f"Saving roster to GCS: gs://{bucket_name}/{cache_blob_name}")
             upload_json_to_gcs(bucket_name, cache_blob_name, roster)
+            
+            local_filename = f"roster_{args.year}_{args.month:02d}.json"
+            with open(local_filename, 'w') as f:
+                json.dump(roster, f, indent=4)
+            print(f"Saved roster locally to {local_filename}")
 
     if roster:
         print_roster(roster, args.year, args.month)
