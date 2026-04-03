@@ -16,11 +16,13 @@ The project automates the creation of monthly duty rosters for a team of consult
 
 **Environment Setup:**
 
-Before running any scripts, activate the Python virtual environment:
+Before running any scripts, activate the Python virtual environment. On this system, use:
 
 ```bash
-source venv/bin/activate
+source ~/.venv/bin/activate
 ```
+
+**Note:** Always use `/Users/dhyanesh/.venv/bin/python` to run scripts to ensure dependencies are correctly loaded.
 
 **1. Roster Generation:**
 
@@ -37,7 +39,7 @@ The `roster_generator_cp.py` script generates a duty roster.
 **Running the script:**
 
 ```bash
-/home/dhyanesh/dev/calendar/venv/bin/python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
+/Users/dhyanesh/.venv/bin/python roster_generator_cp.py -y <year> -m <month> --vacations-file vacations.json
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
@@ -62,7 +64,7 @@ The `trilife_shifts.py` script parses a PDF roster and creates a schedule in Goo
 **Running the script:**
 
 ```bash
-/home/dhyanesh/dev/calendar/venv/bin/python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-calendar
+/Users/dhyanesh/.venv/bin/python trilife_shifts.py <consultant_name> <pdf_path> --create-sheet --import-calendar
 ```
 
 *   `<consultant_name>`: The name of the consultant (e.g., "Mittal").
@@ -83,12 +85,24 @@ The `import_roster_to_calendar.py` script imports a roster from a Google Sheet a
 **Running the script:**
 
 ```bash
-/home/dhyanesh/dev/calendar/venv/bin/python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_name>
+/Users/dhyanesh/.venv/bin/python import_roster_to_calendar.py -y <year> -m <month> --sheet-name <sheet_name>
 ```
 
 *   `<year>`: The year for the roster (e.g., 2025).
 *   `<month>`: The month for the roster (e.g., 10).
 *   `<sheet_name>`: The name of the worksheet to import from.
+
+**4. Manual Roster Import from JSON:**
+
+When a roster is provided as an image (e.g., from WhatsApp):
+
+1.  **Extract Data:** Manually extract the shift data and create a JSON file with the format:
+    `[{"date": "YYYY-MM-DD", "day": "Day", "morning": "Initial/Initial", "afternoon": "Initial", "night": "Initial/Initial"}, ...]`
+    Example: `roster_2026_04.json`.
+2.  **Import Script:** Use the consolidated import script to create calendar events.
+    ```bash
+    /Users/dhyanesh/.venv/bin/python import_manual_roster.py -y <year> -m <month> -c <initials>
+    ```
 
 ### Development Conventions
 
@@ -96,12 +110,14 @@ The `import_roster_to_calendar.py` script imports a roster from a Google Sheet a
 *   **Code Style:** The code is generally well-structured, with classes and functions for different functionalities. The `trilife_shifts.py` script follows a more object-oriented approach.
 *   **Configuration:** `roster_generator_cp.py` has hardcoded requests for October 2025 and uses a local JSON file for caching (`roster_<year>_<month>.json`). The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
 *   **Dependencies:** The required Python libraries are listed in the "Building and Running" section. A `requirements.txt` file would be a good addition to the project.
+*   **Manual Imports:** For monthly rosters received as images, the workflow is to create a month-specific JSON and use `import_manual_roster.py` to handle calendar API calls.
 
 ### Key Files
 
 *   `roster_generator_cp.py`: The main script for generating the duty roster using OR-Tools. It supports caching and exporting to Google Sheets.
 *   `trilife_shifts.py`: A script to parse a PDF roster and create a schedule in Google Sheets and Calendar.
 *   `import_roster_to_calendar.py`: A script to import a roster from a Google Sheet and create events in Google Calendar.
+*   `import_manual_roster.py`: Consolidated script for importing shifts from a manual JSON roster to Google Calendar.
 *   `shifts.py`: A simpler, interactive script for creating shift schedules.
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
@@ -109,3 +125,4 @@ The `import_roster_to_calendar.py` script imports a roster from a Google Sheet a
 *   `trilife_constraints.txt`: A text file containing all the constraints for the roster generation.
 *   `consultant_requests_2025_10.txt`: A text file containing the leave requests and shift preferences for each consultant for October 2025.
 *   `roster_2025_10.json`: The generated roster for October 2025.
+*   `roster_2026_04.json`: Manually extracted roster for April 2026.
