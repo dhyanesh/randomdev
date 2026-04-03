@@ -106,7 +106,7 @@ When a roster is provided as an image (e.g., from WhatsApp):
 
 ### Development Conventions
 
-*   **Testing:** The project uses the `unittest` framework for testing. Test files are `test_roster_generator.py` and `test_trilife_shifts.py`.
+*   **Testing:** The project uses the `unittest` framework for testing. Test files are located in the `tests/` directory (e.g., `tests/test_roster_generator.py` and `tests/test_trilife_shifts.py`).
 *   **Code Style:** The code is generally well-structured, with classes and functions for different functionalities. The `trilife_shifts.py` script follows a more object-oriented approach.
 *   **Configuration:** `roster_generator_cp.py` has hardcoded requests for October 2025 and uses a local JSON file for caching (`data/roster_<year>_<month>.json`). The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
 *   **Dependencies:** The required Python libraries are listed in the "Building and Running" section. A `requirements.txt` file would be a good addition to the project.
@@ -118,9 +118,13 @@ When a roster is provided as an image (e.g., from WhatsApp):
 *   `trilife_shifts.py`: A script to parse a PDF roster and create a schedule in Google Sheets and Calendar.
 *   `import_roster_to_calendar.py`: A script to import a roster from a Google Sheet and create events in Google Calendar.
 *   `import_manual_roster.py`: Consolidated script for importing shifts from a manual JSON roster to Google Calendar.
-*   `shifts.py`: A simpler, interactive script for creating shift schedules.
-*   `test_roster_generator.py`: Unit tests for the roster generator.
-*   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
+*   `scripts/`: Directory for helper, analysis, and interactive scripts.
+    *   `scripts/shifts.py`: A simpler, interactive script for creating shift schedules.
+    *   `scripts/analyze_manual_roster.py`: Analysis script for manual rosters.
+    *   `scripts/analyze_requests.py`: Script to analyze unmet consultant requests.
+*   `tests/`: Directory for unit tests.
+    *   `tests/test_roster_generator.py`: Unit tests for the roster generator.
+    *   `tests/test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
 *   `data/`: Directory containing all manual rosters, requests, and other data files.
     *   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025.
     *   `trilife_constraints.txt`: A text file containing all the constraints for the roster generation.
