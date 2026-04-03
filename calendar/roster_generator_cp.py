@@ -378,7 +378,7 @@ def main(argv=None):
             print(f"Saving roster to GCS: gs://{bucket_name}/{cache_blob_name}")
             upload_json_to_gcs(bucket_name, cache_blob_name, roster)
             
-            local_filename = f"roster_{args.year}_{args.month:02d}.json"
+            local_filename = f"data/roster_{args.year}_{args.month:02d}.json"
             with open(local_filename, 'w') as f:
                 json.dump(roster, f, indent=4)
             print(f"Saved roster locally to {local_filename}")

@@ -27,7 +27,7 @@ class GoogleCalendarService:
 
 def import_roster(year: int, month: int, consultant: str, calendar_id: str):
     creds_file = 'your_service_account_file.json'
-    roster_file = f'roster_{year}_{month:02d}.json'
+    roster_file = f'data/roster_{year}_{month:02d}.json'
     initial = consultant
 
     try:

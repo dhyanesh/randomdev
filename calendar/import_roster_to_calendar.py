@@ -21,6 +21,7 @@ class GoogleServiceProvider:
         self.creds = self._authenticate(creds_file)
         self.sheets_client = gspread.authorize(self.creds)
         self.calendar_service = build('calendar', 'v3', credentials=self.creds)
+        self.drive_service = build('drive', 'v3', credentials=self.creds)
 
     def _authenticate(self, creds_file: str) -> Credentials:
         scopes = [

@@ -98,7 +98,7 @@ When a roster is provided as an image (e.g., from WhatsApp):
 
 1.  **Extract Data:** Manually extract the shift data and create a JSON file with the format:
     `[{"date": "YYYY-MM-DD", "day": "Day", "morning": "Initial/Initial", "afternoon": "Initial", "night": "Initial/Initial"}, ...]`
-    Example: `roster_2026_04.json`.
+    Example: `data/roster_2026_04.json`.
 2.  **Import Script:** Use the consolidated import script to create calendar events.
     ```bash
     /Users/dhyanesh/.venv/bin/python import_manual_roster.py -y <year> -m <month> -c <initials>
@@ -108,9 +108,9 @@ When a roster is provided as an image (e.g., from WhatsApp):
 
 *   **Testing:** The project uses the `unittest` framework for testing. Test files are `test_roster_generator.py` and `test_trilife_shifts.py`.
 *   **Code Style:** The code is generally well-structured, with classes and functions for different functionalities. The `trilife_shifts.py` script follows a more object-oriented approach.
-*   **Configuration:** `roster_generator_cp.py` has hardcoded requests for October 2025 and uses a local JSON file for caching (`roster_<year>_<month>.json`). The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
+*   **Configuration:** `roster_generator_cp.py` has hardcoded requests for October 2025 and uses a local JSON file for caching (`data/roster_<year>_<month>.json`). The `trilife_shifts.py` script uses a hardcoded dictionary for consultant information.
 *   **Dependencies:** The required Python libraries are listed in the "Building and Running" section. A `requirements.txt` file would be a good addition to the project.
-*   **Manual Imports:** For monthly rosters received as images, the workflow is to create a month-specific JSON and use `import_manual_roster.py` to handle calendar API calls.
+*   **Manual Imports:** For monthly rosters received as images, the workflow is to create a month-specific JSON in the `data/` directory and use `import_manual_roster.py` to handle calendar API calls.
 
 ### Key Files
 
@@ -121,8 +121,9 @@ When a roster is provided as an image (e.g., from WhatsApp):
 *   `shifts.py`: A simpler, interactive script for creating shift schedules.
 *   `test_roster_generator.py`: Unit tests for the roster generator.
 *   `test_trilife_shifts.py`: Unit tests for the Trilife shift scheduler.
-*   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025. This is used with the `--fixed-roster` argument in `roster_generator_cp.py` to ensure that the specified shifts are not changed during roster generation.
-*   `trilife_constraints.txt`: A text file containing all the constraints for the roster generation.
-*   `consultant_requests_2025_10.txt`: A text file containing the leave requests and shift preferences for each consultant for October 2025.
-*   `roster_2025_10.json`: The generated roster for October 2025.
-*   `roster_2026_04.json`: Manually extracted roster for April 2026.
+*   `data/`: Directory containing all manual rosters, requests, and other data files.
+    *   `fixed_roster_2025_10.json`: A JSON file that defines a fixed partial roster for October 2025.
+    *   `trilife_constraints.txt`: A text file containing all the constraints for the roster generation.
+    *   `consultant_requests_2025_10.txt`: A text file containing the leave requests and shift preferences for each consultant for October 2025.
+    *   `roster_2025_10.json`: The generated roster for October 2025.
+    *   `roster_2026_04.json`: Manually extracted roster for April 2026.
