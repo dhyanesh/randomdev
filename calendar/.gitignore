@@ -1,3 +1,14 @@
 __pycache__/
 venv/
 your_service_account_file.json
+package-lock.json
+data/
+*.jpg
+*.jpeg
+*.png
+*.docx
+*.html
+*.json
+!monthly_constraints/*.py
+!tests/*.py
+!scripts/*.py
