@@ -1,39 +1,45 @@
 #!/usr/bin/env bash
 
-# This script pulls all .mp4 timelapse videos from your Pixel's Camera folder
-# within a specific sequential time range.
+# This script pulls .mp4 videos based on file modification time, ignoring filenames.
 
-START_PREFIX=$1
-END_PREFIX=$2
+START_TIME=$1
+END_TIME=$2
+DEST_DIR=${3:-./data}
 
-if [ -z "$START_PREFIX" ] || [ -z "$END_PREFIX" ]; then
-    echo "Usage: $0 <start_timestamp_prefix> <end_timestamp_prefix>"
-    echo "Example: $0 20260613_22 20260614_04"
+if [ -z "$START_TIME" ] || [ -z "$END_TIME" ]; then
+    echo "Usage: $0 <start_time> <end_time> [dest_dir]"
+    echo "Format: YYYYMMDD_HHMM"
+    echo "Example: $0 20260613_2200 20260614_0445 ./data/2026-06-14"
+    exit 1
+fi
+
+# Convert human-readable times to Unix Epoch (seconds) on macOS
+START_EPOCH=$(date -j -f "%Y%m%d_%H%M" "$START_TIME" "+%s" 2>/dev/null)
+END_EPOCH=$(date -j -f "%Y%m%d_%H%M" "$END_TIME" "+%s" 2>/dev/null)
+
+if [ -z "$START_EPOCH" ] || [ -z "$END_EPOCH" ]; then
+    echo "Error parsing dates. Please ensure they are in YYYYMMDD_HHMM format."
     exit 1
 fi
 
 echo "Connecting to Pixel via ADB..."
 adb devices | grep -q "device$" || { echo "Device not found. Please connect your phone."; exit 1; }
 
-echo "Targeting videos from $START_PREFIX to $END_PREFIX..."
-mkdir -p data
+echo "Targeting videos created between $START_TIME and $END_TIME..."
+mkdir -p "$DEST_DIR"
 
-# We use adb shell to list the files, then pull them one by one
-adb shell 'ls /sdcard/DCIM/Camera/*.mp4 2>/dev/null' | tr -d '\r' | while read -r file; do
-    filename=$(basename "$file")
+# Fetch file modification times and paths from Android, compare against epochs
+adb shell 'stat -c "%Y %n" /sdcard/DCIM/Camera/*.mp4 2>/dev/null' | tr -d '\r' | while read -r line; do
+    # Extract epoch (everything before the first space) and filepath (everything after)
+    file_epoch="${line%% *}"
+    filepath="${line#* }"
     
-    # Extract the timestamp (YYYYMMDD_HHMMSS) from standard Android filenames
-    timestamp=$(echo "$filename" | grep -oE '[0-9]{8}_[0-9]{6}')
-    
-    if [ -n "$timestamp" ]; then
-        # Lexicographical string comparison
-        # Includes files >= START_PREFIX and strictly < END_PREFIX
-        if [[ "$timestamp" > "$START_PREFIX" || "$timestamp" == "$START_PREFIX"* ]] && [[ "$timestamp" < "$END_PREFIX" ]]; then
-            echo "Downloading: $filename"
-            adb pull "$file" ./data/
-        fi
+    if [ -n "$file_epoch" ] && [ "$file_epoch" -ge "$START_EPOCH" ] 2>/dev/null && [ "$file_epoch" -lt "$END_EPOCH" ] 2>/dev/null; then
+        filename=$(basename "$filepath")
+        echo "Downloading: $filename"
+        adb pull "$filepath" "$DEST_DIR/"
     fi
 done
 
 echo ""
-echo "Transfer complete! Videos in the specified range are in the ./data/ folder."
+echo "Transfer complete! Videos in the specified time range are in the $DEST_DIR folder."

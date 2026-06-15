@@ -24,7 +24,7 @@ fi
 echo "Found $COUNT videos. Stitching them together..."
 
 # Use ffmpeg concat demuxer to losslessly stitch them together
-ffmpeg -f concat -safe 0 -i "$TMPFILE" -c copy final_timelapse.mp4
+ffmpeg -y -f concat -safe 0 -i "$TMPFILE" -c copy final_timelapse.mp4
 
 echo ""
 echo "Done! Your stitched video is saved as: final_timelapse.mp4"
