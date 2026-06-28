@@ -161,7 +161,15 @@ def main():
     parser.add_argument('-y', '--year', type=int, default=datetime.now().year, help='The year of the roster.')
     parser.add_argument('-m', '--month', type=int, default=datetime.now().month, help='The month of the roster.')
     parser.add_argument('--sheet-name', type=str, default='Sheet1', help='Name of the worksheet to import from.')
+    parser.add_argument('--consultant', type=str, help='Name of the consultant to import for.')
     args = parser.parse_args()
+
+    if args.consultant:
+        if args.consultant in consultant_map:
+            consultant_map = {args.consultant: consultant_map[args.consultant]}
+        else:
+            print(f"Error: Consultant '{args.consultant}' not found in the configuration.")
+            exit(1)
 
     try:
         google_service = GoogleServiceProvider('your_service_account_file.json')
